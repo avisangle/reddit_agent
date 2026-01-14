@@ -1,0 +1,156 @@
+# Reddit Comment Engagement Agent - Implementation Stories
+
+**Last Updated:** 2026-01-13  
+**Status:** All core stories complete. Agent operational.
+
+---
+
+## Phase 1: The Ironclad Foundation ✅
+
+### Story 0: Shared Contract, Schema & Migrations ✅
+- [x] Define `schemas.py` (Pydantic) and `database.py` (SQLAlchemy)
+- [x] Set up Alembic for migrations
+- [x] Implement `Settings` with regex validation
+- [x] Tables: `replied_items`, `draft_queue`, `subreddit_rules_cache`, `error_log`, `daily_stats`
+
+**Output:** `models/`, `migrations/`, `config.py`
+
+### Story 1: Observability (Structured Logging) ✅
+- [x] Configure `structlog` for JSON output
+- [x] Create standardized `Logger` factory
+- [x] Auto-redaction of `token`, `secret`, `password` keys
+
+**Output:** `utils/logging.py`
+
+---
+
+## Phase 2: Core Logic & Filtering ✅
+
+### Story 2: Reddit Client with Shadowban Kill-Switch ✅
+- [x] AutoMod/Bot filtering (AutoModerator, `(?i)(bot|assistant)`)
+- [x] Shadowban detection (403s, empty listings)
+- [x] Circuit breaker based on risk score
+- [x] Rate limit handling
+- [x] Rising posts discovery (<45 min, 3-20 comments)
+- [x] Controversial keyword filtering
+- [x] Post reply support (`CandidatePost`)
+
+**Output:** `services/reddit_client.py`
+
+### Story 3: The Vertical Context Builder ✅
+- [x] Vertical chain: Root → A → B → C (Target)
+- [x] Sibling exclusion
+- [x] Token limit truncation
+- [x] Post reply context support
+
+**Output:** `services/context_builder.py`
+
+### Story 4: Subreddit Rule Interpreter & Cache Enforcement ✅
+- [x] Keyword block detection ("No support threads")
+- [x] Cache-first blocking (no network calls for cached rules)
+- [x] Bot ban detection
+- [x] 24-hour cache TTL
+
+**Output:** `services/rule_engine.py`
+
+---
+
+## Phase 3: Content & Generation ✅
+
+### Story 5: Prompt & Few-Shot Management ✅
+- [x] External loading from `prompts/templates.yaml`
+- [x] 5 persona templates with few-shot examples
+- [x] Subreddit → persona mapping
+- [x] PII scrubbing (email, phone, SSN, credit card, IP)
+
+**Output:** `services/prompt_manager.py`, `prompts/templates.yaml`
+
+### Story 6: The Generator (LLM) ✅
+- [x] Gemini 2.5 Flash integration
+- [x] OpenAI/Anthropic support (alternative)
+- [x] Context + prompt → draft
+- [x] Banned phrase detection ("As an AI model")
+- [x] Retry logic on failures
+
+**Output:** `agents/generator.py`
+
+---
+
+## Phase 4: State, Safety & Concurrency ✅
+
+### Story 7: Idempotency, State & Cooldowns ✅
+- [x] Duplicate prevention (`UNIQUE(reddit_id)`)
+- [x] Failed → cooldown logic
+- [x] Status flow: PENDING → APPROVED → PUBLISHED
+- [x] Daily stats tracking
+
+**Output:** `services/state_manager.py`
+
+### Story 8: Secure Webhook & Callback Listener ✅
+- [x] Outbound HMAC signatures
+- [x] FastAPI callback server
+- [x] Approve/reject endpoints
+- [x] Slack Block Kit integration
+- [x] Telegram inline keyboard support
+
+**Output:** `services/notification.py`, `services/notifiers/`, `api/callback_server.py`
+
+---
+
+## Phase 5: Operations ✅
+
+### Story 9: Orchestration, Jitter & Safety Gates ✅
+- [x] LangGraph workflow (9 nodes)
+- [x] Dry run mode
+- [x] Safety gate on `SafetyLockoutException`
+- [x] Random jitter (5-10s between actions)
+- [x] Post/comment ratio selection
+- [x] One comment per post (diversity)
+
+**Output:** `workflow/graph.py`, `workflow/nodes.py`, `workflow/runner.py`
+
+### Story 10: CI/CD & Deploy Checks ✅
+- [x] Pre-commit hooks (black, flake8, mypy, isort)
+- [x] GitHub Actions CI
+- [x] Docker support
+
+**Output:** `.pre-commit-config.yaml`, `.github/workflows/ci.yml`, `Dockerfile`
+
+---
+
+## Pending Items (Not Stories)
+
+### High Priority
+1. **Slack Interactivity Endpoint** - Add `/api/slack/interactions` to handle button clicks
+2. **Callback Server Deployment** - Need to run server to receive approvals
+
+### Medium Priority
+3. **Auto-publish flow** - Post approved drafts automatically after Slack approval
+4. **Monitoring dashboard** - Visualize daily stats and error rates
+
+### Low Priority
+5. **Multi-LLM fallback** - Fall back to OpenAI if Gemini fails
+6. **Scheduled runs** - Cron-style autonomous operation
+
+---
+
+## Test Coverage
+
+| Test File | Count | Status |
+|-----------|-------|--------|
+| test_config.py | ✓ | All passing |
+| test_context_builder.py | ✓ | All passing |
+| test_database.py | ✓ | All passing |
+| test_generator.py | ✓ | All passing |
+| test_logging.py | ✓ | All passing |
+| test_monitoring.py | ✓ | All passing |
+| test_notifiers.py | ✓ | All passing |
+| test_poster.py | ✓ | All passing |
+| test_prompt_manager.py | ✓ | All passing |
+| test_reddit_client.py | ✓ | All passing |
+| test_rule_engine.py | ✓ | All passing |
+| test_state_manager.py | ✓ | All passing |
+| test_webhook.py | ✓ | All passing |
+| test_workflow.py | ✓ | All passing |
+
+**Total: 136 tests passing**
