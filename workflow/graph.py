@@ -12,8 +12,10 @@ from .state import AgentState
 from .nodes import (
     fetch_candidates_node,
     select_by_ratio_node,
+    score_candidates_node,
     filter_candidates_node,
     check_rules_node,
+    sort_by_score_node,
     check_daily_limit_node,
     select_candidate_node,
     build_context_node,
@@ -70,23 +72,26 @@ def create_workflow_graph(
     generator: Any,
     state_manager: Any,
     notifier: Any,
+    quality_scorer: Any = None,
     settings: Any = None
 ) -> WorkflowGraph:
     """
     Create the agent workflow graph.
-    
+
     Flow:
     1. fetch_candidates - Get posts and comments from inbox/rising
     2. select_by_ratio - Select candidates based on post/comment ratio
-    3. filter_candidates - Remove already-replied, cooldown
-    4. check_rules - Filter restricted subreddits
-    5. check_daily_limit - Stop if at limit
-    6. select_candidate - Pick next to process
-    7. build_context - Build conversation context
-    8. generate_draft - Generate reply with LLM
-    9. notify_human - Save draft and send webhook
-    10. Loop back to check_daily_limit or end
-    
+    3. score_candidates - Score candidates for quality ranking (NEW)
+    4. filter_candidates - Remove already-replied, cooldown
+    5. check_rules - Filter restricted subreddits
+    6. sort_by_score - Sort by quality score with exploration (NEW)
+    7. check_daily_limit - Stop if at limit
+    8. select_candidate - Pick next to process
+    9. build_context - Build conversation context
+    10. generate_draft - Generate reply with LLM
+    11. notify_human - Save draft and send webhook
+    12. Loop back to check_daily_limit or end
+
     Args:
         reddit_client: Reddit API client
         context_builder: Context builder service
@@ -95,8 +100,9 @@ def create_workflow_graph(
         generator: LLM draft generator
         state_manager: State manager for persistence
         notifier: Webhook notifier
+        quality_scorer: Quality scoring service (optional, Phase 1)
         settings: Configuration settings
-        
+
     Returns:
         Configured WorkflowGraph
     """
@@ -107,8 +113,10 @@ def create_workflow_graph(
     # Bind dependencies to nodes
     fetch_node = partial(fetch_candidates_node, reddit_client=reddit_client, settings=settings)
     ratio_node = partial(select_by_ratio_node, settings=settings)
+    score_node = partial(score_candidates_node, quality_scorer=quality_scorer)
     filter_node = partial(filter_candidates_node, state_manager=state_manager)
     rules_node = partial(check_rules_node, rule_engine=rule_engine)
+    sort_node = partial(sort_by_score_node, settings=settings)
     limit_node = partial(check_daily_limit_node, state_manager=state_manager)
     context_node = partial(
         build_context_node,
@@ -129,8 +137,10 @@ def create_workflow_graph(
     # Add nodes
     wrapper.add_node("fetch_candidates", fetch_node)
     wrapper.add_node("select_by_ratio", ratio_node)
+    wrapper.add_node("score_candidates", score_node)
     wrapper.add_node("filter_candidates", filter_node)
     wrapper.add_node("check_rules", rules_node)
+    wrapper.add_node("sort_by_score", sort_node)
     wrapper.add_node("check_daily_limit", limit_node)
     wrapper.add_node("select_candidate", select_candidate_node)
     wrapper.add_node("build_context", context_node)
@@ -142,9 +152,11 @@ def create_workflow_graph(
     
     # Add edges (linear flow with loop)
     wrapper.add_edge("fetch_candidates", "select_by_ratio")
-    wrapper.add_edge("select_by_ratio", "filter_candidates")
+    wrapper.add_edge("select_by_ratio", "score_candidates")
+    wrapper.add_edge("score_candidates", "filter_candidates")
     wrapper.add_edge("filter_candidates", "check_rules")
-    wrapper.add_edge("check_rules", "check_daily_limit")
+    wrapper.add_edge("check_rules", "sort_by_score")
+    wrapper.add_edge("sort_by_score", "check_daily_limit")
     
     # Conditional: check daily limit
     wrapper.add_conditional_edges(

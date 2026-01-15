@@ -42,6 +42,7 @@ class CandidateComment:
     post_title: str
     parent_id: str
     candidate_type: str = "comment"  # Type discriminator
+    quality_score: float = 0.0  # Quality score (populated by QualityScorer)
 
 
 @dataclass
@@ -55,6 +56,7 @@ class CandidatePost:
     body: str  # selftext
     context_url: str
     candidate_type: str = "post"  # Type discriminator
+    quality_score: float = 0.0  # Quality score (populated by QualityScorer)
 
 
 # Type alias for any candidate

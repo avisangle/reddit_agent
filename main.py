@@ -69,7 +69,31 @@ def create_services(settings: Settings, session):
         slack_webhook_url=settings.slack_webhook_url,
         slack_channel=settings.slack_channel
     )
-    
+
+    # Performance tracker (Phase 3 - Historical Learning)
+    performance_tracker = None
+    if settings.learning_enabled:
+        from services.performance_tracker import PerformanceTracker
+        performance_tracker = PerformanceTracker(
+            session=session,
+            settings=settings
+        )
+        logger.info("historical_learning_enabled")
+    else:
+        logger.info("historical_learning_disabled")
+
+    # Quality scoring (optional, controlled by feature flag)
+    quality_scorer = None
+    if settings.quality_scoring_enabled:
+        from services.quality_scorer import QualityScorer
+        quality_scorer = QualityScorer(
+            settings=settings,
+            performance_tracker=performance_tracker  # Phase 3: Inject PerformanceTracker
+        )
+        logger.info("quality_scoring_enabled")
+    else:
+        logger.info("quality_scoring_disabled")
+
     return {
         "reddit_client": RedditClient(),
         "context_builder": ContextBuilder(max_tokens=2000),
@@ -80,7 +104,8 @@ def create_services(settings: Settings, session):
             session=session,
             max_daily=settings.max_comments_per_day
         ),
-        "notifier": notifier
+        "notifier": notifier,
+        "quality_scorer": quality_scorer
     }
 
 
@@ -277,6 +302,66 @@ def publish_approved_drafts(limit: int = 3, dry_run: bool = False):
             session.close()
 
 
+def check_engagement_metrics(limit: int = 50):
+    """
+    Check engagement metrics for published comments after 24h.
+
+    Args:
+        limit: Maximum drafts to check
+    """
+    configure_logging()
+    logger.info("engagement_check_starting", limit=limit)
+
+    try:
+        settings = get_settings()
+
+        # Initialize database
+        init_db()
+        SessionLocal = get_session_local()
+        session = SessionLocal()
+
+        # Create services
+        from services.reddit_client import RedditClient
+        from services.state_manager import StateManager
+        from services.engagement_checker import EngagementChecker
+
+        reddit_client = RedditClient()
+        state_manager = StateManager(
+            session=session,
+            max_daily=settings.max_comments_per_day
+        )
+
+        engagement_checker = EngagementChecker(
+            session=session,
+            reddit_client=reddit_client,
+            state_manager=state_manager,
+            settings=settings
+        )
+
+        # Check engagement
+        results = engagement_checker.check_pending_engagements(limit=limit)
+
+        # Summary
+        logger.info(
+            "engagement_check_completed",
+            checked=results["checked"],
+            success=results["success"],
+            failed=results["failed"]
+        )
+
+        # Print results
+        print(f"✅ Checked: {results['checked']}")
+        print(f"✅ Success: {results['success']}")
+        print(f"❌ Failed: {results['failed']}")
+
+    except Exception as e:
+        logger.error("engagement_check_failed", error=str(e))
+        raise
+    finally:
+        if 'session' in locals():
+            session.close()
+
+
 def main():
     """Main entry point with CLI arguments."""
     parser = argparse.ArgumentParser(
@@ -334,7 +419,19 @@ def main():
         action="store_true",
         help="Run without actually posting"
     )
-    
+
+    # Check-engagement command (Phase 4)
+    engagement_parser = subparsers.add_parser(
+        "check-engagement",
+        help="Check engagement metrics for published comments"
+    )
+    engagement_parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help="Maximum drafts to check (default: 50)"
+    )
+
     args = parser.parse_args()
     
     if args.command == "run":
@@ -359,7 +456,10 @@ def main():
     
     elif args.command == "publish":
         publish_approved_drafts(limit=args.limit, dry_run=args.dry_run)
-        
+
+    elif args.command == "check-engagement":
+        check_engagement_metrics(limit=args.limit)
+
     else:
         parser.print_help()
 

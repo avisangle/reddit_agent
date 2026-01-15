@@ -58,6 +58,7 @@ class WorkflowRunner:
         generator: Any,
         state_manager: Any,
         notifier: Any,
+        quality_scorer: Any = None,
         settings: Any = None,
         min_jitter: int = 30,
         max_jitter: int = 90,
@@ -66,7 +67,7 @@ class WorkflowRunner:
     ):
         """
         Initialize workflow runner.
-        
+
         Args:
             reddit_client: Reddit API client
             context_builder: Context builder
@@ -75,9 +76,10 @@ class WorkflowRunner:
             generator: Draft generator
             state_manager: State manager
             notifier: Webhook notifier
+            quality_scorer: Quality scorer (optional, Phase 1)
             settings: Configuration settings
             min_jitter: Minimum seconds between operations
-            max_jitter: Maximum seconds between operations  
+            max_jitter: Maximum seconds between operations
             max_per_run: Maximum drafts per run
             dry_run: If True, don't actually post or notify
         """
@@ -103,6 +105,7 @@ class WorkflowRunner:
             generator=generator,
             state_manager=state_manager,
             notifier=notifier,
+            quality_scorer=quality_scorer,
             settings=settings
         )
         

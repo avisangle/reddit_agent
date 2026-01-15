@@ -78,7 +78,76 @@ class Settings(BaseSettings):
     
     # Mode
     dry_run: bool = False
-    
+
+    # Quality Scoring System
+    quality_scoring_enabled: bool = True
+
+    # Score Weights (must sum to 1.0, will be normalized)
+    score_weight_upvote: float = 0.15
+    score_weight_karma: float = 0.10
+    score_weight_freshness: float = 0.20
+    score_weight_velocity: float = 0.15
+    score_weight_question: float = 0.15
+    score_weight_depth: float = 0.10
+    score_weight_historical: float = 0.15
+
+    # Minimum Score Thresholds
+    score_minimum_threshold: float = 0.35
+    score_minimum_for_post: float = 0.40
+
+    # Upvote Ratio Thresholds
+    score_upvote_excellent: float = 0.90
+    score_upvote_good: float = 0.75
+    score_upvote_mixed: float = 0.60
+
+    # Author Karma Thresholds
+    score_karma_established: int = 10000
+    score_karma_active: int = 1000
+    score_karma_regular: int = 100
+
+    # Thread Freshness Thresholds (seconds)
+    score_freshness_hot: int = 900  # 15 min
+    score_freshness_active: int = 1800  # 30 min
+    score_freshness_warm: int = 3600  # 60 min
+    score_freshness_cooling: int = 7200  # 120 min
+
+    # Engagement Velocity Thresholds (comments/minute)
+    score_velocity_viral: float = 1.0
+    score_velocity_high: float = 0.5
+    score_velocity_moderate: float = 0.2
+    score_velocity_low: float = 0.1
+
+    # Thread Depth Thresholds
+    score_depth_ideal_min: int = 5
+    score_depth_ideal_max: int = 15
+    score_depth_early_min: int = 3
+    score_depth_crowded_max: int = 30
+
+    # Question Signal Keywords (comma-separated)
+    score_help_keywords: str = "how do I,help,advice,recommend,suggest,anyone know"
+    score_problem_keywords: str = "issue,problem,error,stuck,struggling,trouble"
+
+    # Exploration vs Exploitation
+    score_exploration_rate: float = 0.15  # 15% random selection
+    score_top_n_random: int = 3  # Randomize top 3
+
+    # Historical Learning System (Phase 3)
+    learning_enabled: bool = True  # Enable historical learning
+    learning_min_samples: int = 5  # Minimum samples before using historical score
+    learning_decay_recent_days: int = 7  # Recent data (weight 1.0)
+    learning_decay_medium_days: int = 30  # Medium age (weight 0.7)
+    learning_decay_old_days: int = 90  # Old data (weight 0.4), older = 0.2
+
+    # Learning Component Weights (must sum to 1.0)
+    learning_weight_approval: float = 0.30  # Approval rate weight
+    learning_weight_publish: float = 0.20  # Publish rate weight
+    learning_weight_engagement: float = 0.30  # Engagement score weight
+    learning_weight_success: float = 0.20  # Success rate weight
+
+    # Engagement Tracking (Phase 4)
+    engagement_check_enabled: bool = True  # Enable engagement tracking
+    engagement_check_delay_hours: int = 24  # Check engagement after 24 hours
+
     @field_validator('reddit_user_agent')
     @classmethod
     def validate_user_agent(cls, v: str) -> str:

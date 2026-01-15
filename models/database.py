@@ -4,13 +4,15 @@ SQLAlchemy database models and session management.
 from datetime import datetime
 from typing import Optional, Generator
 from sqlalchemy import (
-    create_engine, 
-    Column, 
-    String, 
-    Integer, 
-    DateTime, 
+    create_engine,
+    Column,
+    String,
+    Integer,
+    DateTime,
     Date,
     Text,
+    Float,
+    Boolean,
     Engine
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -35,7 +37,7 @@ class RepliedItem(Base):
 class DraftQueue(Base):
     """Queue of drafts awaiting approval."""
     __tablename__ = "draft_queue"
-    
+
     draft_id = Column(String, primary_key=True, index=True)
     reddit_id = Column(String, nullable=False, unique=True, index=True)  # Prevent duplicates
     subreddit = Column(String, nullable=False, index=True)
@@ -45,7 +47,14 @@ class DraftQueue(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     approved_at = Column(DateTime, nullable=True)
     approval_token_hash = Column(String, nullable=True, index=True)  # SHA-256 hash of approval token
-    
+
+    # Performance tracking fields (Phase 2)
+    comment_id = Column(String(50), nullable=True)  # Reddit comment ID after publishing
+    published_at = Column(DateTime, nullable=True)  # When comment was published
+    engagement_checked = Column(Boolean, default=False, nullable=False)  # Whether engagement was fetched
+    candidate_type = Column(String(20), nullable=True)  # "post" or "comment"
+    quality_score = Column(Float, nullable=True)  # Quality score at selection time
+
     def __repr__(self):
         return f"<DraftQueue(draft_id='{self.draft_id}', status='{self.status}')>"
 
@@ -80,12 +89,32 @@ class SubredditRulesCache(Base):
 class DailyStats(Base):
     """Track daily comment counts for volume limits."""
     __tablename__ = "daily_stats"
-    
+
     date = Column(Date, primary_key=True, index=True)
     comment_count = Column(Integer, nullable=False, default=0)
-    
+
     def __repr__(self):
         return f"<DailyStats(date={self.date}, count={self.comment_count})>"
+
+
+class PerformanceHistory(Base):
+    """Track draft outcomes and engagement metrics for learning."""
+    __tablename__ = "performance_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    draft_id = Column(String(50), nullable=False, index=True)
+    subreddit = Column(String(50), nullable=False, index=True)
+    candidate_type = Column(String(20), nullable=False)  # "post" or "comment"
+    quality_score = Column(Float, nullable=True)  # Quality score at selection time
+    outcome = Column(String(20), nullable=False)  # PENDING, APPROVED, REJECTED, PUBLISHED, IGNORED
+    engagement_score = Column(Float, nullable=True)  # Calculated engagement metric
+    upvotes_24h = Column(Integer, nullable=True)  # Upvotes after 24 hours
+    replies_24h = Column(Integer, nullable=True)  # Replies after 24 hours
+    created_at = Column(DateTime, nullable=False, index=True)  # When draft was created
+    outcome_at = Column(DateTime, nullable=True)  # When outcome was determined
+
+    def __repr__(self):
+        return f"<PerformanceHistory(draft_id='{self.draft_id}', outcome='{self.outcome}')>"
 
 
 # Lazy database initialization

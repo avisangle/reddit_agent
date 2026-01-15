@@ -152,6 +152,109 @@ def select_by_ratio_node(
     return {"candidates": candidates}
 
 
+def score_candidates_node(
+    state: Any,
+    quality_scorer: Any
+) -> Dict[str, Any]:
+    """
+    Score all candidates for quality ranking.
+
+    Attaches quality_score to each candidate using the QualityScorer service.
+
+    Args:
+        state: Current workflow state
+        quality_scorer: QualityScorer instance (or None if disabled)
+
+    Returns:
+        Dict with updated candidates list
+    """
+    if not quality_scorer or not state.candidates:
+        # Scoring disabled or no candidates, pass through
+        return {}
+
+    scored_candidates = []
+    for candidate in state.candidates:
+        try:
+            scored = quality_scorer.score_candidate(candidate)
+            scored_candidates.append(scored)
+        except Exception as e:
+            logger.error(
+                "candidate_scoring_error",
+                reddit_id=candidate.reddit_id,
+                error=str(e)
+            )
+            # Keep candidate with default score on error
+            scored_candidates.append(candidate)
+
+    if scored_candidates:
+        avg_score = sum(c.quality_score for c in scored_candidates) / len(scored_candidates)
+        logger.info(
+            "candidates_scored",
+            count=len(scored_candidates),
+            avg_score=round(avg_score, 3)
+        )
+
+    return {"candidates": scored_candidates}
+
+
+def sort_by_score_node(
+    state: Any,
+    settings: Any
+) -> Dict[str, Any]:
+    """
+    Sort candidates by quality score with exploration logic.
+
+    Implements exploration vs exploitation:
+    - (100 - exploration_rate)% of the time: sort by score descending
+    - exploration_rate% of the time: randomize top N to avoid patterns
+
+    Args:
+        state: Current workflow state
+        settings: Application settings
+
+    Returns:
+        Dict with sorted candidates list
+    """
+    import random
+
+    if not state.candidates:
+        return {}
+
+    # Sort by score descending
+    sorted_candidates = sorted(
+        state.candidates,
+        key=lambda c: c.quality_score,
+        reverse=True
+    )
+
+    # Apply exploration logic
+    exploration_rate = getattr(settings, 'score_exploration_rate', 0.15)
+    top_n = getattr(settings, 'score_top_n_random', 3)
+
+    if random.random() < exploration_rate and len(sorted_candidates) >= top_n:
+        # Exploration: randomize top N
+        top_pool = sorted_candidates[:top_n]
+        rest = sorted_candidates[top_n:]
+        random.shuffle(top_pool)
+        sorted_candidates = top_pool + rest
+
+        logger.info(
+            "exploration_applied",
+            top_n=top_n,
+            exploration_rate=exploration_rate
+        )
+
+    if sorted_candidates:
+        logger.info(
+            "candidates_sorted",
+            count=len(sorted_candidates),
+            top_score=round(sorted_candidates[0].quality_score, 3),
+            bottom_score=round(sorted_candidates[-1].quality_score, 3)
+        )
+
+    return {"candidates": sorted_candidates}
+
+
 def filter_candidates_node(
     state: Any,
     state_manager: Any
@@ -378,30 +481,47 @@ def notify_human_node(
 ) -> Dict[str, Any]:
     """
     Send draft for human approval.
-    
+
     - Save draft to queue (returns approval token)
     - Send webhook notification with approval token
+    - Record initial PENDING performance outcome (Phase 2)
     """
     draft = state.draft
     candidate = state.current_candidate
-    
+
     if not draft or not candidate:
         return {}
-    
+
     try:
         # Save to draft queue - returns approval_token
+        # Phase 2: Pass candidate_type and quality_score
         approval_token = state_manager.save_draft(
             draft_id=draft.draft_id,
             reddit_id=draft.reddit_id,
             subreddit=draft.subreddit,
             content=draft.content,
-            context_url=candidate.context_url
+            context_url=candidate.context_url,
+            candidate_type=candidate.candidate_type,
+            quality_score=candidate.quality_score
         )
-        
+
         if not approval_token:
             logger.warning("draft_already_exists", draft_id=draft.draft_id)
             return {}
-        
+
+        # Phase 2: Record initial PENDING outcome
+        try:
+            state_manager.record_performance_outcome(
+                draft_id=draft.draft_id,
+                subreddit=candidate.subreddit,
+                candidate_type=candidate.candidate_type,
+                quality_score=candidate.quality_score,
+                outcome="PENDING"
+            )
+        except Exception as e:
+            # Don't fail workflow if performance tracking fails
+            logger.warning("performance_tracking_failed", draft_id=draft.draft_id, error=str(e))
+
         # Send notification with approval token
         notifier.send_draft_notification(
             draft_id=draft.draft_id,
@@ -410,16 +530,16 @@ def notify_human_node(
             thread_url=candidate.context_url,
             approval_token=approval_token
         )
-        
+
         logger.info(
             "human_notified",
             draft_id=draft.draft_id
         )
-        
+
         return {
             "processed_count": state.processed_count + 1
         }
-        
+
     except Exception as e:
         logger.error(
             "notification_failed",

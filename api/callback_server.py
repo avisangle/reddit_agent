@@ -121,6 +121,27 @@ def process_callback(
             action=action,
             new_status=new_status
         )
+
+        # Phase 2: Record approval/rejection outcome in performance_history
+        try:
+            draft = state_manager.get_draft_by_id(draft_id)
+            if draft:
+                state_manager.record_performance_outcome(
+                    draft_id=draft_id,
+                    subreddit=draft.subreddit,
+                    candidate_type=draft.candidate_type or "comment",
+                    quality_score=draft.quality_score or 0.0,
+                    outcome=new_status
+                )
+        except Exception as e:
+            # Don't fail callback if performance tracking fails
+            logger.warning(
+                "performance_tracking_failed",
+                draft_id=draft_id,
+                action=action,
+                error=str(e)
+            )
+
         return {
             "success": True,
             "message": f"Draft {action}d successfully",

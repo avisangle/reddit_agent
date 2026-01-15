@@ -84,13 +84,15 @@ class StateManager:
         subreddit: str,
         content: str,
         context_url: str,
-        status: str = "PENDING"
+        status: str = "PENDING",
+        candidate_type: str = "comment",
+        quality_score: float = 0.0
     ) -> Optional[str]:
         """
         Save a draft to the queue.
-        
+
         Idempotent: if reddit_id already exists, skip gracefully.
-        
+
         Args:
             draft_id: Unique draft identifier
             reddit_id: Reddit item ID being replied to
@@ -98,7 +100,9 @@ class StateManager:
             content: Draft content
             context_url: URL to the thread
             status: Initial status (default PENDING)
-            
+            candidate_type: "post" or "comment" (Phase 2)
+            quality_score: Quality score at selection time (Phase 2)
+
         Returns:
             Approval token (plaintext) if saved, None if duplicate
         """
@@ -106,7 +110,7 @@ class StateManager:
             # Generate secure token and store its hash
             approval_token = secrets.token_urlsafe(32)
             token_hash = _hash_token(approval_token)
-            
+
             draft = DraftQueue(
                 draft_id=draft_id,
                 reddit_id=reddit_id,
@@ -115,19 +119,23 @@ class StateManager:
                 context_url=context_url,
                 status=status,
                 created_at=datetime.utcnow(),
-                approval_token_hash=token_hash
+                approval_token_hash=token_hash,
+                candidate_type=candidate_type,
+                quality_score=quality_score
             )
             self._session.add(draft)
             self._session.commit()
-            
+
             logger.info(
                 "draft_saved",
                 draft_id=draft_id,
                 reddit_id=reddit_id,
-                subreddit=subreddit
+                subreddit=subreddit,
+                candidate_type=candidate_type,
+                quality_score=round(quality_score, 3)
             )
             return approval_token
-            
+
         except IntegrityError:
             # Duplicate reddit_id - skip gracefully
             self._session.rollback()
@@ -359,12 +367,121 @@ class StateManager:
         """Check if we're under the daily limit."""
         count = self.get_daily_count()
         can_post = count < self._max_daily
-        
+
         if not can_post:
             logger.warning(
                 "daily_limit_reached",
                 count=count,
                 max=self._max_daily
             )
-        
+
         return can_post
+
+    # ========================================
+    # Performance Tracking (Phase 2)
+    # ========================================
+
+    def record_performance_outcome(
+        self,
+        draft_id: str,
+        subreddit: str,
+        candidate_type: str,
+        quality_score: float,
+        outcome: str
+    ) -> None:
+        """
+        Record performance outcome for a draft.
+
+        Creates or updates performance_history record.
+
+        Args:
+            draft_id: Draft identifier
+            subreddit: Subreddit name
+            candidate_type: "post" or "comment"
+            quality_score: Quality score at selection time
+            outcome: PENDING, APPROVED, REJECTED, PUBLISHED
+        """
+        from models.database import PerformanceHistory
+
+        # Check if record exists
+        existing = self._session.query(PerformanceHistory).filter_by(
+            draft_id=draft_id
+        ).first()
+
+        if existing:
+            # Update existing record
+            existing.outcome = outcome
+            existing.outcome_at = datetime.utcnow()
+        else:
+            # Create new record
+            record = PerformanceHistory(
+                draft_id=draft_id,
+                subreddit=subreddit,
+                candidate_type=candidate_type,
+                quality_score=quality_score,
+                outcome=outcome,
+                created_at=datetime.utcnow(),
+                outcome_at=datetime.utcnow() if outcome != "PENDING" else None
+            )
+            self._session.add(record)
+
+        self._session.commit()
+
+        logger.info(
+            "performance_outcome_recorded",
+            draft_id=draft_id,
+            outcome=outcome
+        )
+
+    def update_engagement_metrics(
+        self,
+        draft_id: str,
+        upvotes: int,
+        replies: int
+    ) -> None:
+        """
+        Update engagement metrics for a published draft.
+
+        Args:
+            draft_id: Draft identifier
+            upvotes: Upvote count after 24h
+            replies: Reply count after 24h
+        """
+        from models.database import PerformanceHistory
+        import math
+
+        record = self._session.query(PerformanceHistory).filter_by(
+            draft_id=draft_id
+        ).first()
+
+        if not record:
+            logger.warning("performance_record_not_found", draft_id=draft_id)
+            return
+
+        # Calculate engagement score: log(upvotes + 1) + (replies * 2)
+        engagement_score = math.log(upvotes + 1) + (replies * 2)
+
+        record.upvotes_24h = upvotes
+        record.replies_24h = replies
+        record.engagement_score = engagement_score
+
+        self._session.commit()
+
+        logger.info(
+            "engagement_metrics_updated",
+            draft_id=draft_id,
+            upvotes=upvotes,
+            replies=replies,
+            engagement_score=round(engagement_score, 2)
+        )
+
+    def mark_engagement_checked(self, comment_id: str) -> None:
+        """Mark a draft as engagement-checked."""
+        draft = self._session.query(DraftQueue).filter_by(
+            comment_id=comment_id
+        ).first()
+
+        if draft:
+            draft.engagement_checked = True
+            self._session.commit()
+            logger.info("engagement_marked_checked", comment_id=comment_id)

@@ -9,6 +9,7 @@ Implements the poster job that:
 """
 import time
 import random
+from datetime import datetime
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -131,11 +132,43 @@ class CommentPoster:
                 body=draft.content,
                 dry_run=self._dry_run
             )
-            
+
             # Update status
             self._state_manager.update_draft_status(draft.draft_id, "PUBLISHED")
+
+            # Phase 2: Update draft with comment_id and published_at
+            if not self._dry_run:
+                try:
+                    # Access the draft object from the database and update it
+                    session = self._state_manager._session
+                    from models.database import DraftQueue
+                    db_draft = session.query(DraftQueue).filter_by(
+                        draft_id=draft.draft_id
+                    ).first()
+
+                    if db_draft:
+                        db_draft.comment_id = comment_id
+                        db_draft.published_at = datetime.utcnow()
+                        session.commit()
+
+                        # Record PUBLISHED outcome in performance_history
+                        self._state_manager.record_performance_outcome(
+                            draft_id=draft.draft_id,
+                            subreddit=db_draft.subreddit,
+                            candidate_type=db_draft.candidate_type or "comment",
+                            quality_score=db_draft.quality_score or 0.0,
+                            outcome="PUBLISHED"
+                        )
+                except Exception as e:
+                    # Don't fail publish if performance tracking fails
+                    logger.warning(
+                        "performance_tracking_failed",
+                        draft_id=draft.draft_id,
+                        error=str(e)
+                    )
+
             self._state_manager.mark_replied(draft.reddit_id, draft.subreddit, "SUCCESS")
-            
+
             if not self._dry_run:
                 self._state_manager.increment_daily_count()
             
