@@ -6,21 +6,41 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import { ArrowUpRight, CheckCircle, Clock, FileText, Ban, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowUpRight, CheckCircle, Clock, FileText, Ban, AlertCircle, Loader2, Check, X } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api-client';
 import { Toaster, toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 
+interface Draft {
+    draft_id?: string;
+    subreddit: string;
+    status: string;
+    quality_score: number | null;
+    created_at: string;
+    context_url: string;
+    approve_url?: string | null;
+    reject_url?: string | null;
+}
+
+interface DashboardStats {
+    status_counts: { PENDING: number; APPROVED: number; PUBLISHED: number; REJECTED: number };
+    daily_count: { count: number; limit: number; percentage: number };
+    performance: { approval_rate: number; publish_rate: number };
+    recent_drafts: Draft[];
+    weekly_trend: { date: string; count: number }[];
+    subreddit_distribution: { subreddit: string; count: number }[];
+}
+
 // Mock Data (Replace with API fetch to /api/stats)
-const MOCK_STATS = {
+const MOCK_STATS: DashboardStats = {
     status_counts: { PENDING: 5, APPROVED: 12, PUBLISHED: 34, REJECTED: 3 },
     daily_count: { count: 3, limit: 8, percentage: 37.5 },
     performance: { approval_rate: 85, publish_rate: 92 },
     recent_drafts: [
-        { subreddit: 'sysadmin', status: 'PENDING', quality_score: 0.85, created_at: '2025-06-15 10:30', context_url: '#' },
-        { subreddit: 'python', status: 'APPROVED', quality_score: 0.92, created_at: '2025-06-15 09:15', context_url: '#' },
-        { subreddit: 'startups', status: 'PUBLISHED', quality_score: 0.78, created_at: '2025-06-14 16:45', context_url: '#' },
-        { subreddit: 'reactjs', status: 'REJECTED', quality_score: 0.45, created_at: '2025-06-14 14:20', context_url: '#' },
+        { subreddit: 'sysadmin', status: 'PENDING', quality_score: 0.85, created_at: '2025-06-15 10:30', context_url: '#', approve_url: '#', reject_url: '#' },
+        { subreddit: 'python', status: 'APPROVED', quality_score: 0.92, created_at: '2025-06-15 09:15', context_url: '#', approve_url: null, reject_url: null },
+        { subreddit: 'startups', status: 'PUBLISHED', quality_score: 0.78, created_at: '2025-06-14 16:45', context_url: '#', approve_url: null, reject_url: null },
+        { subreddit: 'reactjs', status: 'REJECTED', quality_score: 0.45, created_at: '2025-06-14 14:20', context_url: '#', approve_url: null, reject_url: null },
     ],
     weekly_trend: [
         { date: 'Mon', count: 4 },
@@ -41,7 +61,7 @@ const MOCK_STATS = {
 
 
 export default function DashboardPage() {
-    const [stats, setStats] = useState(MOCK_STATS);
+    const [stats, setStats] = useState<DashboardStats>(MOCK_STATS);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -215,7 +235,7 @@ export default function DashboardPage() {
                                             <TableHead>Status</TableHead>
                                             <TableHead>Quality</TableHead>
                                             <TableHead>Created</TableHead>
-                                            <TableHead className="text-right">Action</TableHead>
+                                            <TableHead className="text-center">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -232,14 +252,30 @@ export default function DashboardPage() {
                                                             {draft.status}
                                                         </Badge>
                                                     </TableCell>
-                                                    <TableCell>{draft.quality_score}</TableCell>
+                                                    <TableCell>{draft.quality_score?.toFixed(2) ?? '-'}</TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{draft.created_at}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        {draft.status === 'PENDING' && (
-                                                            <Button variant="ghost" size="sm" asChild>
-                                                                <a href={draft.context_url} className="text-blue-600 hover:text-blue-800">View</a>
+                                                    <TableCell>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            {draft.status === 'PENDING' && draft.approve_url && draft.reject_url && (
+                                                                <>
+                                                                    <Button variant="ghost" size="sm" asChild className="text-green-600 hover:text-green-800 hover:bg-green-50 p-1 h-7 w-7">
+                                                                        <a href={draft.approve_url} target="_blank" rel="noopener noreferrer" title="Approve">
+                                                                            <Check className="h-4 w-4" />
+                                                                        </a>
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="sm" asChild className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 h-7 w-7">
+                                                                        <a href={draft.reject_url} target="_blank" rel="noopener noreferrer" title="Reject">
+                                                                            <X className="h-4 w-4" />
+                                                                        </a>
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                            <Button variant="ghost" size="sm" asChild className="text-blue-600 hover:text-blue-800 p-1 h-7">
+                                                                <a href={draft.context_url} target="_blank" rel="noopener noreferrer" title="View context">
+                                                                    View
+                                                                </a>
                                                             </Button>
-                                                        )}
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             ))

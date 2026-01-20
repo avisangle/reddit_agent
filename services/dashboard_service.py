@@ -333,9 +333,11 @@ class DashboardService:
                         "draft_id": d.draft_id,
                         "subreddit": d.subreddit,
                         "status": d.status,
-                        "quality_score": d.quality_score,
+                        "quality_score": round(d.quality_score, 2) if d.quality_score else None,
                         "created_at": d.created_at.strftime("%Y-%m-%d %H:%M"),
-                        "context_url": d.context_url
+                        "context_url": d.context_url,
+                        "approve_url": d.approve_url if d.status == "PENDING" else None,
+                        "reject_url": d.reject_url if d.status == "PENDING" else None
                     }
                     for d in self.get_recent_drafts(session=session)
                 ]

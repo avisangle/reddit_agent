@@ -17,8 +17,10 @@ from sqlalchemy.exc import IntegrityError
 
 from models.database import DraftQueue, RepliedItem, DailyStats
 from utils.logging import get_logger
+from config import Settings
 
 logger = get_logger(__name__)
+settings = Settings()
 
 # Token configuration
 TOKEN_TTL_HOURS = 48  # Tokens expire after 48 hours
@@ -115,6 +117,11 @@ class StateManager:
             approval_token = secrets.token_urlsafe(32)
             token_hash = _hash_token(approval_token)
 
+            # Build approval URLs for dashboard display
+            base_url = settings.public_url.rstrip('/')
+            approve_url = f"{base_url}/approve?token={approval_token}&action=approve"
+            reject_url = f"{base_url}/approve?token={approval_token}&action=reject"
+
             draft = DraftQueue(
                 draft_id=draft_id,
                 reddit_id=reddit_id,
@@ -124,6 +131,8 @@ class StateManager:
                 status=status,
                 created_at=datetime.utcnow(),
                 approval_token_hash=token_hash,
+                approve_url=approve_url,
+                reject_url=reject_url,
                 candidate_type=candidate_type,
                 quality_score=quality_score
             )

@@ -49,6 +49,10 @@ class DraftQueue(Base):
     approved_at = Column(DateTime, nullable=True)
     approval_token_hash = Column(String, nullable=True, index=True)  # SHA-256 hash of approval token
 
+    # Approval URLs (stored for dashboard display)
+    approve_url = Column(String(500), nullable=True)
+    reject_url = Column(String(500), nullable=True)
+
     # Performance tracking fields (Phase 2)
     comment_id = Column(String(50), nullable=True)  # Reddit comment ID after publishing
     published_at = Column(DateTime, nullable=True)  # When comment was published

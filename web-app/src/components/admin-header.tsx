@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, BookOpen } from 'lucide-react';
 
 export function AdminHeader() {
     const pathname = usePathname();
     const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+    const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || 'https://github.com/yourusername/reddit_agent#readme';
 
     const handleLogout = async () => {
         try {
@@ -47,10 +48,21 @@ export function AdminHeader() {
                         ))}
                     </nav>
                 </div>
-                <Button size="sm" onClick={handleLogout}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                </Button>
+                <div className="flex items-center gap-2">
+                    <a
+                        href={DOCS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        <span className="hidden sm:inline">Docs</span>
+                    </a>
+                    <Button size="sm" onClick={handleLogout}>
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
+                    </Button>
+                </div>
             </div>
         </header>
     );
