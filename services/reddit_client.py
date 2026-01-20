@@ -41,8 +41,10 @@ class CandidateComment:
     context_url: str
     post_title: str
     parent_id: str
+    post_id: str = ""  # Submission ID (Phase B: for diversity filtering)
     candidate_type: str = "comment"  # Type discriminator
     quality_score: float = 0.0  # Quality score (populated by QualityScorer)
+    priority: str = "NORMAL"  # Priority level: HIGH (inbox) or NORMAL (rising)
 
 
 @dataclass
@@ -57,6 +59,7 @@ class CandidatePost:
     context_url: str
     candidate_type: str = "post"  # Type discriminator
     quality_score: float = 0.0  # Quality score (populated by QualityScorer)
+    priority: str = "NORMAL"  # Priority level: HIGH (inbox) or NORMAL (rising)
 
 
 # Type alias for any candidate
@@ -136,12 +139,15 @@ class RedditClient:
         self._total_requests = 0
         self._rate_limit_remaining = 100
         self._rate_limit_reset = 0
-        
+
         # Post discovery settings
         self._max_post_age_seconds = 45 * 60 * 15 # 45 minutes
         self._min_comments = 3
         self._max_comments = 20
-        
+
+        # Cache for rising posts (per workflow run) to avoid duplicate fetches
+        self._rising_posts_cache = {}  # {subreddit: List[Submission]}
+
         # Initialize PRAW client (lazy)
         self._reddit: Optional[praw.Reddit] = None
         
@@ -443,7 +449,8 @@ class RedditClient:
                     body=item.body,
                     context_url=f"https://reddit.com{item.permalink}",
                     post_title=item.submission.title,
-                    parent_id=item.parent_id
+                    parent_id=item.parent_id,
+                    post_id=item.submission.id  # Phase B: Extract post ID for diversity
                 )
                 candidates.append(candidate)
                 
@@ -464,33 +471,55 @@ class RedditClient:
         logger.info("inbox_fetch_complete", count=len(candidates))
         return candidates
     
+    def clear_cache(self) -> None:
+        """
+        Clear the rising posts cache.
+
+        Should be called at the start of each workflow run to ensure fresh data.
+        """
+        self._rising_posts_cache = {}
+        logger.debug("rising_posts_cache_cleared")
+
     def fetch_rising_posts(self, subreddit: str, limit: int = 10) -> List[Submission]:
         """
-        Fetch rising posts from a subreddit.
-        
+        Fetch rising posts from a subreddit with caching.
+
         Filters (PRD §6.2):
         - Age < 45 minutes
         - Comment count 3-20
         - Not locked or removed
         - No controversial keywords
-        
+
+        Caching: Results are cached per subreddit for the duration of a single
+        workflow run to avoid duplicate API calls. Call clear_cache() at the
+        start of each run.
+
         Args:
             subreddit: Subreddit name
             limit: Maximum posts to fetch
-            
+
         Returns:
             List of valid submissions
         """
+        # Check cache first
+        if subreddit in self._rising_posts_cache:
+            logger.debug(
+                "rising_posts_cache_hit",
+                subreddit=subreddit,
+                cached_count=len(self._rising_posts_cache[subreddit])
+            )
+            return self._rising_posts_cache[subreddit]
+
         self._check_rate_limit()
         self._check_shadowban_risk()
-        
+
         valid_posts = []
-        
+
         try:
             sub = self.reddit.subreddit(subreddit)
             rising = sub.rising(limit=limit)
             self._total_requests += 1
-            
+
             for post in rising:
                 if not self._is_valid_post_age(post):
                     continue
@@ -500,7 +529,7 @@ class RedditClient:
                     continue
                 if self._has_controversial_keywords(post):
                     continue
-                
+
                 valid_posts.append(post)
                 logger.info(
                     "rising_post_found",
@@ -508,17 +537,25 @@ class RedditClient:
                     title=post.title[:50],
                     comments=post.num_comments
                 )
-            
+
             if len(valid_posts) == 0:
                 self._record_error("empty_listing")
-                
+
+            # Store in cache
+            self._rising_posts_cache[subreddit] = valid_posts
+            logger.debug(
+                "rising_posts_cached",
+                subreddit=subreddit,
+                count=len(valid_posts)
+            )
+
         except Exception as e:
             error_str = str(e)
             if "403" in error_str:
                 self._record_error("403")
             logger.error("rising_fetch_error", subreddit=subreddit, error=error_str)
             raise
-        
+
         return valid_posts
     
     def fetch_rising_candidates(self, limit_per_subreddit: int = 5, one_per_post: bool = True) -> List[CandidateComment]:
@@ -559,7 +596,8 @@ class RedditClient:
                             body=comment.body,
                             context_url=f"https://reddit.com{comment.permalink}",
                             post_title=post.title,
-                            parent_id=comment.parent_id
+                            parent_id=comment.parent_id,
+                            post_id=post.id  # Phase B: Extract post ID for diversity
                         )
                         candidates.append(candidate)
                         

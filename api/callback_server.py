@@ -16,7 +16,10 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Header, Request, Form, Query, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from pathlib import Path
 
 from utils.logging import get_logger
 from services.poster import CommentPoster, PublishResult
@@ -226,15 +229,29 @@ def create_callback_app(
     Returns:
         Configured FastAPI app
     """
+    from fastapi.middleware.cors import CORSMiddleware
+    
     app = FastAPI(
         title="Reddit Agent Callback Server",
         description="HITL approval callback endpoints"
     )
     
+    # Add CORS middleware for Next.js frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     # Store poster for auto-publish
     _poster = poster
     _auto_publish = auto_publish and poster is not None
-    
+
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         """Add security headers to all responses."""
@@ -244,263 +261,295 @@ def create_callback_app(
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         return response
-    
-    @app.post("/api/callback/{draft_id}")
-    async def handle_callback(
-        draft_id: str,
-        request: Request,
-        x_signature: str = Header(None, alias="X-Signature")
-    ):
-        """Handle approval/rejection callback."""
-        # Parse body
-        body = await request.json()
-        
-        # Validate signature
-        if not validate_signature(body, x_signature, secret):
-            raise HTTPException(status_code=401, detail="Invalid signature")
-        
-        action = body.get("action")
-        reason = body.get("reason")
-        
-        result = process_callback(
-            action=action,
-            draft_id=draft_id,
-            state_manager=state_manager,
-            reason=reason
-        )
-        
-        if not result["success"]:
-            raise HTTPException(status_code=400, detail=result["message"])
-        
-        return CallbackResponse(**result)
-    
-    @app.get("/api/drafts/pending")
-    async def get_pending_drafts():
-        """Get all pending drafts."""
-        drafts = state_manager.get_pending_drafts()
-        return {
-            "drafts": [
-                {
-                    "draft_id": d.draft_id,
-                    "reddit_id": d.reddit_id,
-                    "subreddit": d.subreddit,
-                    "content": d.content,
-                    "context_url": d.context_url,
-                    "created_at": d.created_at.isoformat()
-                }
-                for d in drafts
-            ]
-        }
-    
-    @app.get("/api/drafts/{draft_id}")
-    async def get_draft(draft_id: str):
-        """Get a specific draft."""
-        draft = state_manager.get_draft_by_id(draft_id)
-        
-        if not draft:
-            raise HTTPException(status_code=404, detail="Draft not found")
-        
-        return {
-            "draft_id": draft.draft_id,
-            "reddit_id": draft.reddit_id,
-            "subreddit": draft.subreddit,
-            "content": draft.content,
-            "context_url": draft.context_url,
-            "status": draft.status,
-            "created_at": draft.created_at.isoformat(),
-            "approved_at": draft.approved_at.isoformat() if draft.approved_at else None
-        }
-    
+
+    # Only register approval/callback routes if state_manager is available
+    # (when .env file exists and agent is configured)
+    if state_manager is not None and secret is not None:
+        @app.post("/api/callback/{draft_id}")
+        async def handle_callback(
+            draft_id: str,
+            request: Request,
+            x_signature: str = Header(None, alias="X-Signature")
+        ):
+            """Handle approval/rejection callback."""
+            # Parse body
+            body = await request.json()
+
+            # Validate signature
+            if not validate_signature(body, x_signature, secret):
+                raise HTTPException(status_code=401, detail="Invalid signature")
+
+            action = body.get("action")
+            reason = body.get("reason")
+
+            result = process_callback(
+                action=action,
+                draft_id=draft_id,
+                state_manager=state_manager,
+                reason=reason
+            )
+
+            if not result["success"]:
+                raise HTTPException(status_code=400, detail=result["message"])
+
+            return CallbackResponse(**result)
+
+        @app.get("/api/drafts/pending")
+        async def get_pending_drafts():
+            """Get all pending drafts."""
+            drafts = state_manager.get_pending_drafts()
+            return {
+                "drafts": [
+                    {
+                        "draft_id": d.draft_id,
+                        "reddit_id": d.reddit_id,
+                        "subreddit": d.subreddit,
+                        "content": d.content,
+                        "context_url": d.context_url,
+                        "created_at": d.created_at.isoformat()
+                    }
+                    for d in drafts
+                ]
+            }
+
+        @app.get("/api/drafts/{draft_id}")
+        async def get_draft(draft_id: str):
+            """Get a specific draft."""
+            draft = state_manager.get_draft_by_id(draft_id)
+
+            if not draft:
+                raise HTTPException(status_code=404, detail="Draft not found")
+
+            return {
+                "draft_id": draft.draft_id,
+                "reddit_id": draft.reddit_id,
+                "subreddit": draft.subreddit,
+                "content": draft.content,
+                "context_url": draft.context_url,
+                "status": draft.status,
+                "created_at": draft.created_at.isoformat(),
+                "approved_at": draft.approved_at.isoformat() if draft.approved_at else None
+            }
+
+        @app.get("/approve", response_class=HTMLResponse)
+        async def handle_approval_link(
+            background_tasks: BackgroundTasks,
+            token: str = Query(..., description="Approval token"),
+            action: str = Query(..., description="Action: approve or reject")
+        ):
+            """
+            Handle approval/rejection via URL link (from Slack buttons).
+
+            This is the simpler approach that doesn't require Slack App interactivity.
+            Buttons in Slack open this URL in a browser.
+
+            If auto_publish is enabled and a poster is configured, approved drafts
+            will be automatically posted to Reddit in the background.
+            """
+            if action not in ["approve", "reject"]:
+                return HTMLResponse(
+                    content=_error_html("Invalid Action", "Action must be 'approve' or 'reject'."),
+                    status_code=400
+                )
+
+            # Basic token format validation (fail fast before DB lookup)
+            if not token or len(token) < 20:
+                logger.warning("approval_invalid_token_format")
+                return HTMLResponse(
+                    content=_error_html("Invalid Link", "This approval link is malformed."),
+                    status_code=400
+                )
+
+            # Find draft by token (includes expiration and status check)
+            draft = state_manager.get_draft_by_token(token)
+
+            if not draft:
+                # Token is invalid, expired, or draft already processed
+                return HTMLResponse(
+                    content=_error_html(
+                        "Link Expired or Invalid",
+                        "This approval link has expired or has already been used. "
+                        "Approval links are valid for 48 hours and can only be used once."
+                    ),
+                    status_code=410  # 410 Gone - resource no longer available
+                )
+
+            # Process the action
+            result = process_callback(
+                action=action,
+                draft_id=draft.draft_id,
+                state_manager=state_manager,
+                reason=None
+            )
+
+            if result["success"]:
+                status_text = "APPROVED" if action == "approve" else "REJECTED"
+                emoji = "✅" if action == "approve" else "❌"
+
+                # Auto-publish if approved and poster is configured
+                publish_message = ""
+                if action == "approve" and _auto_publish and _poster:
+                    # Re-fetch draft to get updated status
+                    updated_draft = state_manager.get_draft_by_id(draft.draft_id)
+                    if updated_draft and updated_draft.status == "APPROVED":
+                        # Publish in background to not block the response
+                        background_tasks.add_task(_publish_draft_async, updated_draft, _poster)
+                        publish_message = " Publishing to Reddit..."
+
+                return HTMLResponse(
+                    content=_success_html(
+                        f"{emoji} Draft {status_text}",
+                        f"Draft for r/{draft.subreddit} has been {status_text.lower()}.{publish_message}",
+                        draft.content[:200] + "..." if len(draft.content) > 200 else draft.content
+                    ),
+                    status_code=200
+                )
+            else:
+                return HTMLResponse(
+                    content=_error_html("Error", result["message"]),
+                    status_code=400
+                )
+
+        @app.post("/api/slack/interactions")
+        async def handle_slack_interaction(
+            request: Request,
+            x_slack_signature: str = Header(None, alias="X-Slack-Signature"),
+            x_slack_request_timestamp: str = Header(None, alias="X-Slack-Request-Timestamp")
+        ):
+            """
+            Handle Slack interactive component callbacks.
+
+            Slack sends button clicks here when users click Approve/Reject.
+            The payload is URL-encoded form data with a 'payload' field containing JSON.
+
+            Configure this URL in Slack App settings:
+            Interactivity & Shortcuts -> Request URL -> {PUBLIC_URL}/api/slack/interactions
+            """
+            body = await request.body()
+            body_str = body.decode("utf-8")
+
+            # Validate Slack signature if bot token is configured
+            if hasattr(state_manager, 'slack_signing_secret') and state_manager.slack_signing_secret:
+                if not _validate_slack_signature(
+                    body_str,
+                    x_slack_signature,
+                    x_slack_request_timestamp,
+                    state_manager.slack_signing_secret
+                ):
+                    logger.warning("slack_signature_validation_failed")
+                    raise HTTPException(status_code=401, detail="Invalid Slack signature")
+
+            # Parse URL-encoded payload
+            try:
+                parsed = urllib.parse.parse_qs(body_str)
+                payload_json = parsed.get("payload", [""])[0]
+                payload = json.loads(payload_json)
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                logger.error("slack_payload_parse_error", error=str(e))
+                raise HTTPException(status_code=400, detail="Invalid payload")
+
+            # Extract action details
+            actions = payload.get("actions", [])
+            if not actions:
+                logger.warning("slack_no_actions_in_payload")
+                return JSONResponse({"text": "No action found"})
+
+            action = actions[0]
+            action_id = action.get("action_id")  # "approve_draft" or "reject_draft"
+            draft_id = action.get("value")  # The draft_id we stored in value
+
+            if not draft_id:
+                logger.warning("slack_no_draft_id", action=action)
+                return JSONResponse({"text": "No draft ID found"})
+
+            # Map action_id to action
+            if action_id == "approve_draft":
+                action_type = "approve"
+            elif action_id == "reject_draft":
+                action_type = "reject"
+            else:
+                logger.warning("slack_unknown_action", action_id=action_id)
+                return JSONResponse({"text": f"Unknown action: {action_id}"})
+
+            # Process the callback
+            result = process_callback(
+                action=action_type,
+                draft_id=draft_id,
+                state_manager=state_manager,
+                reason=None
+            )
+
+            # Get original message for update
+            original_message = payload.get("message", {})
+            user_info = payload.get("user", {})
+            user_name = user_info.get("username", "Unknown user")
+
+            if result["success"]:
+                status_emoji = "✅" if action_type == "approve" else "❌"
+                status_text = "APPROVED" if action_type == "approve" else "REJECTED"
+
+                # Return updated message to replace the original
+                return JSONResponse({
+                    "replace_original": True,
+                    "blocks": [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"{status_emoji} *Draft {status_text}*\n\nDraft `{draft_id}` was {status_text.lower()} by @{user_name}"
+                            }
+                        },
+                        {
+                            "type": "context",
+                            "elements": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"Processed at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+                                }
+                            ]
+                        }
+                    ]
+                })
+            else:
+                return JSONResponse({
+                    "replace_original": False,
+                    "text": f"⚠️ Failed to process: {result['message']}"
+                })
+
+        logger.info("approval_routes_registered", state_manager_available=True)
+    else:
+        logger.info("approval_routes_skipped", reason="state_manager_not_available")
+
+    # Health check endpoint - always available
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
         return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-    
-    @app.get("/approve", response_class=HTMLResponse)
-    async def handle_approval_link(
-        background_tasks: BackgroundTasks,
-        token: str = Query(..., description="Approval token"),
-        action: str = Query(..., description="Action: approve or reject")
-    ):
-        """
-        Handle approval/rejection via URL link (from Slack buttons).
-        
-        This is the simpler approach that doesn't require Slack App interactivity.
-        Buttons in Slack open this URL in a browser.
-        
-        If auto_publish is enabled and a poster is configured, approved drafts
-        will be automatically posted to Reddit in the background.
-        """
-        if action not in ["approve", "reject"]:
-            return HTMLResponse(
-                content=_error_html("Invalid Action", "Action must be 'approve' or 'reject'."),
-                status_code=400
-            )
-        
-        # Basic token format validation (fail fast before DB lookup)
-        if not token or len(token) < 20:
-            logger.warning("approval_invalid_token_format")
-            return HTMLResponse(
-                content=_error_html("Invalid Link", "This approval link is malformed."),
-                status_code=400
-            )
-        
-        # Find draft by token (includes expiration and status check)
-        draft = state_manager.get_draft_by_token(token)
-        
-        if not draft:
-            # Token is invalid, expired, or draft already processed
-            return HTMLResponse(
-                content=_error_html(
-                    "Link Expired or Invalid", 
-                    "This approval link has expired or has already been used. "
-                    "Approval links are valid for 48 hours and can only be used once."
-                ),
-                status_code=410  # 410 Gone - resource no longer available
-            )
-        
-        # Process the action
-        result = process_callback(
-            action=action,
-            draft_id=draft.draft_id,
-            state_manager=state_manager,
-            reason=None
-        )
-        
-        if result["success"]:
-            status_text = "APPROVED" if action == "approve" else "REJECTED"
-            emoji = "✅" if action == "approve" else "❌"
-            
-            # Auto-publish if approved and poster is configured
-            publish_message = ""
-            if action == "approve" and _auto_publish and _poster:
-                # Re-fetch draft to get updated status
-                updated_draft = state_manager.get_draft_by_id(draft.draft_id)
-                if updated_draft and updated_draft.status == "APPROVED":
-                    # Publish in background to not block the response
-                    background_tasks.add_task(_publish_draft_async, updated_draft, _poster)
-                    publish_message = " Publishing to Reddit..."
-            
-            return HTMLResponse(
-                content=_success_html(
-                    f"{emoji} Draft {status_text}",
-                    f"Draft for r/{draft.subreddit} has been {status_text.lower()}.{publish_message}",
-                    draft.content[:200] + "..." if len(draft.content) > 200 else draft.content
-                ),
-                status_code=200
-            )
-        else:
-            return HTMLResponse(
-                content=_error_html("Error", result["message"]),
-                status_code=400
-            )
-    
-    @app.post("/api/slack/interactions")
-    async def handle_slack_interaction(
-        request: Request,
-        x_slack_signature: str = Header(None, alias="X-Slack-Signature"),
-        x_slack_request_timestamp: str = Header(None, alias="X-Slack-Request-Timestamp")
-    ):
-        """
-        Handle Slack interactive component callbacks.
-        
-        Slack sends button clicks here when users click Approve/Reject.
-        The payload is URL-encoded form data with a 'payload' field containing JSON.
-        
-        Configure this URL in Slack App settings:
-        Interactivity & Shortcuts -> Request URL -> {PUBLIC_URL}/api/slack/interactions
-        """
-        body = await request.body()
-        body_str = body.decode("utf-8")
-        
-        # Validate Slack signature if bot token is configured
-        if hasattr(state_manager, 'slack_signing_secret') and state_manager.slack_signing_secret:
-            if not _validate_slack_signature(
-                body_str, 
-                x_slack_signature, 
-                x_slack_request_timestamp,
-                state_manager.slack_signing_secret
-            ):
-                logger.warning("slack_signature_validation_failed")
-                raise HTTPException(status_code=401, detail="Invalid Slack signature")
-        
-        # Parse URL-encoded payload
-        try:
-            parsed = urllib.parse.parse_qs(body_str)
-            payload_json = parsed.get("payload", [""])[0]
-            payload = json.loads(payload_json)
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            logger.error("slack_payload_parse_error", error=str(e))
-            raise HTTPException(status_code=400, detail="Invalid payload")
-        
-        # Extract action details
-        actions = payload.get("actions", [])
-        if not actions:
-            logger.warning("slack_no_actions_in_payload")
-            return JSONResponse({"text": "No action found"})
-        
-        action = actions[0]
-        action_id = action.get("action_id")  # "approve_draft" or "reject_draft"
-        draft_id = action.get("value")  # The draft_id we stored in value
-        
-        if not draft_id:
-            logger.warning("slack_no_draft_id", action=action)
-            return JSONResponse({"text": "No draft ID found"})
-        
-        # Map action_id to action
-        if action_id == "approve_draft":
-            action_type = "approve"
-        elif action_id == "reject_draft":
-            action_type = "reject"
-        else:
-            logger.warning("slack_unknown_action", action_id=action_id)
-            return JSONResponse({"text": f"Unknown action: {action_id}"})
-        
-        # Process the callback
-        result = process_callback(
-            action=action_type,
-            draft_id=draft_id,
-            state_manager=state_manager,
-            reason=None
-        )
-        
-        # Get original message for update
-        original_message = payload.get("message", {})
-        user_info = payload.get("user", {})
-        user_name = user_info.get("username", "Unknown user")
-        
-        if result["success"]:
-            status_emoji = "✅" if action_type == "approve" else "❌"
-            status_text = "APPROVED" if action_type == "approve" else "REJECTED"
-            
-            # Return updated message to replace the original
-            return JSONResponse({
-                "replace_original": True,
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"{status_emoji} *Draft {status_text}*\n\nDraft `{draft_id}` was {status_text.lower()} by @{user_name}"
-                        }
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "mrkdwn",
-                                "text": f"Processed at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
-                            }
-                        ]
-                    }
-                ]
-            })
-        else:
-            return JSONResponse({
-                "replace_original": False,
-                "text": f"⚠️ Failed to process: {result['message']}"
-            })
-    
+
+    # Mount admin routes (Phase 1 - Frontend)
+    try:
+        from api.admin_routes import router as admin_router
+        app.include_router(admin_router)
+        logger.info("admin_routes_mounted")
+    except ImportError as e:
+        logger.warning("admin_routes_not_available", error=str(e))
+
+    # Mount setup wizard routes (Phase 7)
+    try:
+        from api.setup_wizard_routes import router as setup_router
+        app.include_router(setup_router)
+        logger.info("setup_wizard_routes_mounted")
+    except ImportError as e:
+        logger.warning("setup_wizard_routes_not_available", error=str(e))
+
+    # Mount static files for admin UI
+    static_path = Path(__file__).parent.parent / "frontend" / "static"
+    if static_path.exists():
+        app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+        logger.info("static_files_mounted", path=str(static_path))
+    else:
+        logger.warning("static_directory_not_found", path=str(static_path))
+
     return app
 
 

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h1>Reddit Agent Admin</h1>
+        <p class="subtitle">Enter your password to access the admin dashboard</p>
+
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/admin/login" class="login-form">
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    required
+                    autofocus
+                    placeholder="Enter admin password"
+                >
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                Login
+            </button>
+        </form>
+
+        <div class="info-box">
+            <p><strong>Default password:</strong> admin123</p>
+            <p class="small-text">Change this in .env: ADMIN_PASSWORD_HASH</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

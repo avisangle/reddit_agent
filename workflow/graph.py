@@ -16,6 +16,7 @@ from .nodes import (
     filter_candidates_node,
     check_rules_node,
     sort_by_score_node,
+    diversity_select_node,
     check_daily_limit_node,
     select_candidate_node,
     build_context_node,
@@ -81,16 +82,17 @@ def create_workflow_graph(
     Flow:
     1. fetch_candidates - Get posts and comments from inbox/rising
     2. select_by_ratio - Select candidates based on post/comment ratio
-    3. score_candidates - Score candidates for quality ranking (NEW)
+    3. score_candidates - Score candidates for quality ranking
     4. filter_candidates - Remove already-replied, cooldown
     5. check_rules - Filter restricted subreddits
-    6. sort_by_score - Sort by quality score with exploration (NEW)
-    7. check_daily_limit - Stop if at limit
-    8. select_candidate - Pick next to process
-    9. build_context - Build conversation context
-    10. generate_draft - Generate reply with LLM
-    11. notify_human - Save draft and send webhook
-    12. Loop back to check_daily_limit or end
+    6. sort_by_score - Sort by priority + quality score with exploration
+    7. diversity_select - Apply subreddit/post diversity filtering (Phase B)
+    8. check_daily_limit - Stop if at limit
+    9. select_candidate - Pick next to process
+    10. build_context - Build conversation context
+    11. generate_draft - Generate reply with LLM
+    12. notify_human - Save draft and send webhook
+    13. Loop back to check_daily_limit or end
 
     Args:
         reddit_client: Reddit API client
@@ -117,6 +119,7 @@ def create_workflow_graph(
     filter_node = partial(filter_candidates_node, state_manager=state_manager)
     rules_node = partial(check_rules_node, rule_engine=rule_engine)
     sort_node = partial(sort_by_score_node, settings=settings)
+    diversity_node = partial(diversity_select_node, settings=settings)
     limit_node = partial(check_daily_limit_node, state_manager=state_manager)
     context_node = partial(
         build_context_node,
@@ -141,6 +144,7 @@ def create_workflow_graph(
     wrapper.add_node("filter_candidates", filter_node)
     wrapper.add_node("check_rules", rules_node)
     wrapper.add_node("sort_by_score", sort_node)
+    wrapper.add_node("diversity_select", diversity_node)
     wrapper.add_node("check_daily_limit", limit_node)
     wrapper.add_node("select_candidate", select_candidate_node)
     wrapper.add_node("build_context", context_node)
@@ -156,7 +160,8 @@ def create_workflow_graph(
     wrapper.add_edge("score_candidates", "filter_candidates")
     wrapper.add_edge("filter_candidates", "check_rules")
     wrapper.add_edge("check_rules", "sort_by_score")
-    wrapper.add_edge("sort_by_score", "check_daily_limit")
+    wrapper.add_edge("sort_by_score", "diversity_select")
+    wrapper.add_edge("diversity_select", "check_daily_limit")
     
     # Conditional: check daily limit
     wrapper.add_conditional_edges(

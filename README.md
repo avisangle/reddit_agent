@@ -2,24 +2,34 @@
 
 A compliance-first, anti-fingerprint Reddit engagement agent that responds to comment replies and participates in allow-listed subreddits with strict volume limits and mandatory human approval.
 
-## Status: ✅ Fully Operational
+## Status: ✅ Fully Operational with Smart Selection
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.4 |
+| Version | 2.5 |
 | Tests | 136 passing |
 | LLM | Gemini 2.5 Flash |
 | Notifications | Slack, Telegram, Webhook |
 | Auto-Publish | ✅ Enabled |
+| Migrations | 4 (latest: 004_add_candidate_type_cooldown) |
+| Quality Scoring | ✅ AI-powered 7-factor scoring |
 
 ## Features
 
 ### ✅ Core Functionality
 - **Dual-mode engagement** - Reply to both posts and comments
-- **Inbox monitoring** - Respond to replies on your posts/comments
+- **Inbox monitoring** - Respond to replies on your posts/comments (HIGH priority)
 - **Rising post discovery** - Find engaging posts in allowed subreddits
 - **LLM-powered drafts** - Natural, persona-matched responses
 - **Auto-publish** - Approved drafts automatically post to Reddit
+
+### ✅ AI-Powered Selection
+- **7-factor quality scoring** - Upvote ratio, karma, freshness, velocity, question signal, depth, historical
+- **Historical learning** - Learns from past performance per subreddit with time decay
+- **Engagement tracking** - Fetches 24h metrics (upvotes, replies) for published comments
+- **Inbox priority** - HIGH priority for inbox replies, processed first
+- **Subreddit diversity** - Max 2/subreddit, max 1/post with quality overrides
+- **Exploration** - 25% randomization to avoid detection patterns
 
 ### ✅ Safety & Compliance
 - **Volume limits** - ≤8 comments/day, ≤3 per run (hardcoded)
@@ -87,13 +97,16 @@ python main.py run --once --dry-run
 ## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    LangGraph Workflow                       │
-├─────────────────────────────────────────────────────────────┤
-│ fetch_candidates → filter → select_by_ratio → check_limit  │
-│                                      ↓                      │
-│ notify_human ← generate_draft ← build_context ← select     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                   LangGraph 13-Node Workflow                        │
+├─────────────────────────────────────────────────────────────────────┤
+│ fetch → ratio → score → filter → rules → sort → diversity → limit  │
+│                                              ↓                      │
+│          notify ← generate ← context ← select                       │
+└─────────────────────────────────────────────────────────────────────┘
+        │
+        ↓ (inbox prioritized, quality-scored, diversity-filtered)
+```
                             │
           ┌─────────────────┼─────────────────┐
           ↓                 ↓                 ↓

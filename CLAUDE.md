@@ -7,10 +7,11 @@ This file provides context for AI assistants working on the Reddit Comment Engag
 | Field | Value |
 |-------|-------|
 | **Name** | Reddit Comment Engagement Agent |
-| **Version** | 2.4 |
-| **Status** | ✅ Fully Operational with Auto-Publish |
-| **Architecture** | LangGraph-based agent with compliance-first design |
+| **Version** | 2.5 |
+| **Status** | ✅ Fully Operational with Smart Selection |
+| **Architecture** | LangGraph-based agent with AI-powered quality scoring |
 | **Tests** | 136 tests passing |
+| **Migrations** | 4 (latest: 004_add_candidate_type_cooldown) |
 
 ### Purpose
 
@@ -24,7 +25,14 @@ A compliance-first, anti-fingerprint Reddit engagement agent that:
 
 ### How to Run
 
+**IMPORTANT**: Always activate the virtual environment before running any Python commands!
+
 ```bash
+# Activate virtual environment (REQUIRED for all Python commands)
+source venv/bin/activate  # macOS/Linux
+# OR
+venv\Scripts\activate  # Windows
+
 # Start the callback server (handles approvals + auto-publish)
 python main.py server
 
@@ -38,6 +46,18 @@ python main.py run --once --dry-run
 python main.py publish --limit 3
 ```
 
+### Virtual Environment
+
+**Location**: `/Users/avinashsangle/AI/Personal/reddit_agent/venv/`
+
+**Critical**: ALL Python commands (python, pip, pytest, alembic) MUST be run with the venv activated. This includes:
+- Installing packages: `source venv/bin/activate && pip install <package>`
+- Running scripts: `source venv/bin/activate && python main.py`
+- Database migrations: `source venv/bin/activate && alembic upgrade head`
+- Running tests: `source venv/bin/activate && pytest`
+
+**Never run**: `pip install` or `python` commands without activating venv first!
+
 ---
 
 ## Implementation Status
@@ -47,20 +67,25 @@ python main.py publish --limit 3
 | Component | Description |
 |-----------|-------------|
 | **Config** | Pydantic settings with validation, auto `.env` loading |
-| **Database** | 5 SQLAlchemy tables with Alembic migrations |
+| **Database** | 6 SQLAlchemy tables with Alembic migrations (4 versions) |
 | **Logging** | Structured JSON logging with auto-redaction |
 | **Reddit Client** | PRAW wrapper with shadowban detection, bot filtering |
 | **Context Builder** | Vertical-first context loading |
 | **Rule Engine** | Subreddit compliance with cache |
 | **Prompt Manager** | YAML templates, 5 personas, PII scrubbing |
 | **Generator** | Gemini 2.5 Flash LLM integration |
-| **State Manager** | Idempotency, cooldowns, secure token handling |
+| **State Manager** | Idempotency, separate cooldowns (6h inbox / 24h rising) |
 | **Notifiers** | Slack, Telegram, Webhook - all with URL-based approval |
-| **Workflow** | LangGraph with 9 nodes, safety gates |
+| **Workflow** | LangGraph with 13 nodes, quality-driven selection |
 | **Post Replies** | Direct post reply support with configurable ratio |
 | **HITL Approval** | URL-based approval flow (no Slack App required) |
 | **Auto-Publish** | Approved drafts auto-post to Reddit |
 | **Security** | Hashed tokens, 48h TTL, one-time use, state machine |
+| **Quality Scoring** | 7-factor AI scoring (upvote ratio, karma, freshness, velocity, question signal, depth, historical) |
+| **Historical Learning** | Learns from past performance per subreddit with decay weighting |
+| **Engagement Tracking** | Fetches 24h metrics (upvotes, replies) for published comments |
+| **Inbox Priority** | HIGH priority tagging for inbox replies (Phase A) |
+| **Subreddit Diversity** | Max 2/subreddit, max 1/post with quality overrides (Phase B) |
 | **CI/CD** | GitHub Actions, pre-commit hooks |
 
 ### ⏳ Pending (Nice to Have)
@@ -190,27 +215,29 @@ post_reply_ratio: float = 0.3      # 30% posts, 70% comments
 
 ---
 
-## Workflow Nodes
+## Workflow Nodes (13-Node Pipeline)
 
 ```
-fetch_candidates → filter_candidates → select_by_ratio → check_daily_limit
-                                                              ↓
-                        notify_human ← generate_draft ← build_context ← select_candidate
-                                                              ↓
-                                                         check_rules
+fetch_candidates → select_by_ratio → score_candidates → filter_candidates →
+check_rules → sort_by_score → diversity_select → check_daily_limit →
+select_candidate → build_context → generate_draft → notify_human → (loop or end)
 ```
 
 | Node | Purpose |
 |------|---------|
-| `fetch_candidates` | Get inbox replies + rising posts/comments |
-| `filter_candidates` | Remove already-processed items |
-| `select_by_ratio` | Apply post/comment ratio distribution |
-| `check_daily_limit` | Enforce ≤8 comments/day |
+| `fetch_candidates` | Get inbox replies (HIGH priority) + rising posts/comments |
+| `select_by_ratio` | Apply post/comment ratio distribution (30% posts, 70% comments) |
+| `score_candidates` | AI scoring with 7 factors (quality_score) |
+| `filter_candidates` | Remove already-replied items and those in cooldown |
+| `check_rules` | Verify subreddit compliance |
+| `sort_by_score` | Sort by (priority, quality_score) with 25% exploration |
+| `diversity_select` | Apply diversity (max 2/subreddit, max 1/post) |
+| `check_daily_limit` | Enforce ≤8 comments/day limit |
 | `select_candidate` | Pick next candidate to process |
 | `build_context` | Load vertical context chain |
-| `check_rules` | Verify subreddit compliance |
 | `generate_draft` | LLM generates reply draft |
 | `notify_human` | Send to Slack/Telegram for approval |
+| `(loop)` | Loop back to check_daily_limit if more candidates remain |
 
 ---
 
@@ -218,11 +245,12 @@ fetch_candidates → filter_candidates → select_by_ratio → check_daily_limit
 
 | Table | Purpose |
 |-------|---------|
-| `replied_items` | Track processed Reddit items |
-| `draft_queue` | Drafts with approval_token_hash, status tracking |
+| `replied_items` | Track processed Reddit items with candidate_type for cooldowns |
+| `draft_queue` | Drafts with approval_token_hash, status, performance fields |
 | `subreddit_rules_cache` | Cached subreddit rules |
 | `error_log` | Error tracking for debugging |
 | `daily_stats` | Daily comment count tracking |
+| `performance_history` | Draft outcomes and 24h engagement metrics for learning |
 
 ---
 
@@ -232,12 +260,13 @@ fetch_candidates → filter_candidates → select_by_ratio → check_daily_limit
 |---------|-------------|
 | `python main.py server` | Start callback server with auto-publish |
 | `python main.py server --no-auto-publish` | Server without auto-publish |
-| `python main.py run --once` | Single workflow run |
+| `python main.py run --once` | Single workflow run with quality scoring |
 | `python main.py run --once --dry-run` | Test without posting |
 | `python main.py publish --limit 3` | Manual publish approved drafts |
+| `python main.py check-engagement --limit 50` | Check 24h engagement metrics for published drafts |
 | `python main.py health` | Show health status |
-| `pytest -v` | Run tests |
-| `alembic upgrade head` | Apply migrations |
+| `pytest -v` | Run tests (136 tests) |
+| `alembic upgrade head` | Apply migrations (current: 004) |
 
 ---
 
@@ -252,6 +281,45 @@ pytest --cov=. --cov-report=html
 
 # Run specific test file
 pytest tests/test_reddit_client.py -v
+```
+
+---
+
+## Quality Scoring & Intelligent Selection
+
+### Phase 1-4: Quality Scoring System
+- **7-factor scoring**: Upvote ratio, author karma, freshness, velocity, question signal, thread depth, historical performance
+- **Historical learning**: Learns from past outcomes per subreddit with time-decay weighting
+- **Engagement tracking**: Fetches 24h metrics (upvotes, replies) for published comments
+- **Exploration rate**: 25% randomization to avoid patterns
+
+### Phase A: Inbox Priority System
+- **HIGH priority**: Inbox replies tagged HIGH, processed before rising content
+- **Separate cooldowns**: 6h for inbox (forgiving), 24h for rising content
+- **Priority sorting**: Sort by (priority, quality_score) tuple
+
+### Phase B: Subreddit Diversity System
+- **Max 2 per subreddit**: Flexible limit with quality boost override (≥0.75)
+- **Max 1 per post**: Strict limit to prevent spam
+- **Quality override**: Exceptional candidates (score ≥0.75) can bypass subreddit limit
+
+### Configuration (.env)
+
+```bash
+# Phase A: Inbox Priority
+INBOX_PRIORITY_ENABLED=True
+INBOX_COOLDOWN_HOURS=6
+RISING_COOLDOWN_HOURS=24
+
+# Phase B: Diversity
+DIVERSITY_ENABLED=True
+MAX_PER_SUBREDDIT=2
+MAX_PER_POST=1
+DIVERSITY_QUALITY_BOOST_THRESHOLD=0.75
+
+# Exploration (Phase B)
+SCORE_EXPLORATION_RATE=0.25  # 25% randomization
+SCORE_TOP_N_RANDOM=5  # Randomize top 5
 ```
 
 ---
@@ -282,5 +350,6 @@ pytest tests/test_reddit_client.py -v
 
 ---
 
-**Last Updated:** 2026-01-13  
-**Version:** 2.4
+**Last Updated:** 2026-01-15
+**Version:** 2.5
+**Features:** Quality Scoring + Historical Learning + Inbox Priority + Subreddit Diversity

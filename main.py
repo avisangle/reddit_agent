@@ -102,7 +102,9 @@ def create_services(settings: Settings, session):
         "generator": DraftGenerator(llm=llm),
         "state_manager": StateManager(
             session=session,
-            max_daily=settings.max_comments_per_day
+            max_daily=settings.max_comments_per_day,
+            cooldown_hours=settings.rising_cooldown_hours,
+            inbox_cooldown_hours=settings.inbox_cooldown_hours
         ),
         "notifier": notifier,
         "quality_scorer": quality_scorer
@@ -193,19 +195,46 @@ def run_callback_server(host: str = "0.0.0.0", port: int = 8000, auto_publish: b
     from services.reddit_client import RedditClient
     from services.poster import CommentPoster
     
+    from pathlib import Path
+
     configure_logging()
+
+    # Check if .env file exists
+    env_file = Path(".env")
+
+    if not env_file.exists():
+        # No .env file - start minimal server with setup wizard only
+        logger.info("no_env_file_starting_setup_mode")
+        app = create_callback_app(
+            state_manager=None,
+            secret=None,
+            poster=None,
+            auto_publish=False
+        )
+        logger.info(
+            "callback_server_starting_setup_mode",
+            host=host,
+            port=port,
+            message="Access setup wizard at http://{}:{}/setup".format(host if host != "0.0.0.0" else "localhost", port)
+        )
+        uvicorn.run(app, host=host, port=port)
+        return
+
+    # .env exists - load settings and initialize normally
     settings = get_settings()
-    
+
     # Initialize database
     init_db()
     SessionLocal = get_session_local()
     session = SessionLocal()
-    
+
     state_manager = StateManager(
         session=session,
-        max_daily=settings.max_comments_per_day
+        max_daily=settings.max_comments_per_day,
+        cooldown_hours=settings.rising_cooldown_hours,
+        inbox_cooldown_hours=settings.inbox_cooldown_hours
     )
-    
+
     # Create poster for auto-publish if enabled
     poster = None
     if auto_publish:
@@ -222,14 +251,14 @@ def run_callback_server(host: str = "0.0.0.0", port: int = 8000, auto_publish: b
         except Exception as e:
             logger.warning("auto_publish_disabled", error=str(e))
             poster = None
-    
+
     app = create_callback_app(
         state_manager=state_manager,
         secret=settings.webhook_secret,
         poster=poster,
         auto_publish=auto_publish
     )
-    
+
     logger.info(
         "callback_server_starting",
         host=host,
@@ -266,9 +295,11 @@ def publish_approved_drafts(limit: int = 3, dry_run: bool = False):
         reddit_client = RedditClient()
         state_manager = StateManager(
             session=session,
-            max_daily=settings.max_comments_per_day
+            max_daily=settings.max_comments_per_day,
+            cooldown_hours=settings.rising_cooldown_hours,
+            inbox_cooldown_hours=settings.inbox_cooldown_hours
         )
-        
+
         poster = CommentPoster(
             reddit_client=reddit_client,
             state_manager=state_manager,
@@ -328,7 +359,9 @@ def check_engagement_metrics(limit: int = 50):
         reddit_client = RedditClient()
         state_manager = StateManager(
             session=session,
-            max_daily=settings.max_comments_per_day
+            max_daily=settings.max_comments_per_day,
+            cooldown_hours=settings.rising_cooldown_hours,
+            inbox_cooldown_hours=settings.inbox_cooldown_hours
         )
 
         engagement_checker = EngagementChecker(

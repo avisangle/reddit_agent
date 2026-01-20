@@ -21,6 +21,12 @@ structlog>=24.1.0
 fastapi>=0.109.0
 uvicorn>=0.27.0
 
+# Admin UI (Phase 1)
+jinja2>=3.1.0
+python-multipart
+bcrypt>=4.0.0
+pyjwt>=2.8.0
+
 # Utilities
 python-dotenv>=1.0.0
 requests>=2.31.0

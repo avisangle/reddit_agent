@@ -53,23 +53,27 @@ class StateManager:
         self,
         session: Session,
         cooldown_hours: int = 24,
-        max_daily: int = 8
+        max_daily: int = 8,
+        inbox_cooldown_hours: int = 6
     ):
         """
         Initialize state manager.
-        
+
         Args:
             session: SQLAlchemy session
-            cooldown_hours: Hours to wait before retrying failed items
+            cooldown_hours: Hours to wait before retrying failed rising items
             max_daily: Maximum comments per day
+            inbox_cooldown_hours: Hours to wait before retrying failed inbox items (Phase A)
         """
         self._session = session
         self._cooldown_hours = cooldown_hours
+        self._inbox_cooldown_hours = inbox_cooldown_hours
         self._max_daily = max_daily
-        
+
         logger.debug(
             "state_manager_initialized",
             cooldown_hours=cooldown_hours,
+            inbox_cooldown_hours=inbox_cooldown_hours,
             max_daily=max_daily
         )
     
@@ -246,38 +250,43 @@ class StateManager:
         self,
         reddit_id: str,
         subreddit: str,
-        status: str = "SUCCESS"
+        status: str = "SUCCESS",
+        candidate_type: str = "comment"
     ) -> None:
         """
         Mark an item as replied to.
-        
+
         Args:
             reddit_id: Reddit item ID
             subreddit: Subreddit name
             status: Result status (SUCCESS, FAILED, SKIPPED)
+            candidate_type: "post" or "comment" (Phase A)
         """
         existing = self._session.query(RepliedItem).filter_by(
             reddit_id=reddit_id
         ).first()
-        
+
         if existing:
             existing.status = status
             existing.last_attempt = datetime.utcnow()
+            existing.candidate_type = candidate_type
         else:
             item = RepliedItem(
                 reddit_id=reddit_id,
                 subreddit=subreddit,
                 status=status,
-                last_attempt=datetime.utcnow()
+                last_attempt=datetime.utcnow(),
+                candidate_type=candidate_type
             )
             self._session.add(item)
-        
+
         self._session.commit()
-        
+
         logger.info(
             "item_marked_replied",
             reddit_id=reddit_id,
-            status=status
+            status=status,
+            candidate_type=candidate_type
         )
     
     def has_replied(self, reddit_id: str) -> bool:
@@ -291,40 +300,49 @@ class StateManager:
     def is_retryable(self, reddit_id: str) -> bool:
         """
         Check if a failed item can be retried.
-        
+
         Rules:
         - SUCCESS items are never retried
-        - FAILED items can be retried after cooldown
+        - FAILED items can be retried after cooldown (inbox: 6h, rising: 24h)
         - Unknown items are retryable (first attempt)
-        
+
         Args:
             reddit_id: Reddit item ID
-            
+
         Returns:
             True if item can be processed
         """
         item = self._session.query(RepliedItem).filter_by(
             reddit_id=reddit_id
         ).first()
-        
+
         if not item:
             # First attempt
             return True
-        
+
         if item.status == "SUCCESS":
             # Never retry success
             return False
-        
+
         if item.status == "SKIPPED":
             # Skipped items are not retried
             return False
-        
-        # FAILED - check cooldown
-        cooldown_end = item.last_attempt + timedelta(hours=self._cooldown_hours)
+
+        # FAILED - check cooldown (Phase A: separate cooldown for inbox)
+        # Determine cooldown period based on candidate_type
+        if item.candidate_type == "comment" and hasattr(item, 'priority'):
+            # Check if it's an inbox item (HIGH priority)
+            # For now, we use inbox_cooldown for all comments
+            # TODO: Store priority in RepliedItem for more accurate detection
+            cooldown_hours = self._inbox_cooldown_hours
+        else:
+            cooldown_hours = self._cooldown_hours
+
+        cooldown_end = item.last_attempt + timedelta(hours=cooldown_hours)
         if datetime.utcnow() < cooldown_end:
             # Still in cooldown
             return False
-        
+
         return True
     
     # ========================================

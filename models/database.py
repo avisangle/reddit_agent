@@ -24,12 +24,13 @@ Base = declarative_base()
 class RepliedItem(Base):
     """Track items that have been replied to."""
     __tablename__ = "replied_items"
-    
+
     reddit_id = Column(String, primary_key=True, index=True)
     subreddit = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False)  # SUCCESS, SKIPPED, BANNED, FAILED
     last_attempt = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+    candidate_type = Column(String(20), nullable=True)  # "post" or "comment" (Phase A)
+
     def __repr__(self):
         return f"<RepliedItem(reddit_id='{self.reddit_id}', status='{self.status}')>"
 
@@ -117,6 +118,36 @@ class PerformanceHistory(Base):
         return f"<PerformanceHistory(draft_id='{self.draft_id}', outcome='{self.outcome}')>"
 
 
+class AdminAuditLog(Base):
+    """Audit log for all admin actions."""
+    __tablename__ = "admin_audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    action = Column(String(100), nullable=False, index=True)  # LOGIN, ENV_UPDATE, BACKUP_RESTORE, etc.
+    ip_address = Column(String(50), nullable=False, index=True)
+    user_agent = Column(String(500), nullable=True)
+    details = Column(Text, nullable=True)  # JSON with action-specific details (redacted secrets)
+    success = Column(Boolean, nullable=False, default=True)
+
+    def __repr__(self):
+        return f"<AdminAuditLog(action='{self.action}', timestamp={self.timestamp})>"
+
+
+class LoginAttempt(Base):
+    """Track login attempts for rate limiting."""
+    __tablename__ = "login_attempts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ip_address = Column(String(50), nullable=False, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    success = Column(Boolean, nullable=False, default=False)
+    user_agent = Column(String(500), nullable=True)
+
+    def __repr__(self):
+        return f"<LoginAttempt(ip='{self.ip_address}', success={self.success})>"
+
+
 # Lazy database initialization
 _engine: Optional[Engine] = None
 _SessionLocal: Optional[sessionmaker] = None
@@ -171,7 +202,7 @@ def SessionLocal() -> sessionmaker:
 def get_db() -> Generator[Session, None, None]:
     """
     Dependency for database sessions.
-    
+
     Yields:
         SQLAlchemy session
     """
@@ -181,6 +212,27 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_db_optional() -> Generator[Optional[Session], None, None]:
+    """
+    Optional dependency for database sessions.
+    Returns None if settings can't be loaded (e.g., during setup wizard).
+
+    Yields:
+        SQLAlchemy session or None
+    """
+    try:
+        SessionLocal = get_session_local()
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+    except Exception as e:
+        # Settings validation failed or database not available
+        # This is expected during setup wizard or partial configuration
+        yield None
 
 
 def init_db(database_url: Optional[str] = None) -> None:

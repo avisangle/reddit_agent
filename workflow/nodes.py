@@ -5,6 +5,7 @@ Each node performs a specific step in the processing pipeline.
 """
 from typing import Any, Dict, List, Optional
 from functools import partial
+from dataclasses import replace
 
 from utils.logging import get_logger
 
@@ -18,7 +19,7 @@ def fetch_candidates_node(
 ) -> Dict[str, Any]:
     """
     Fetch candidate posts and comments from Reddit.
-    
+
     Sources:
     - Inbox replies to our comments (comments only)
     - Rising posts as post candidates
@@ -27,17 +28,23 @@ def fetch_candidates_node(
     post_candidates = []
     comment_candidates = []
     errors = []
-    
+
+    # Clear cache at the start of each workflow run to ensure fresh data
+    # This prevents duplicate API calls when fetching posts and comments
+    reddit_client.clear_cache()
+
     # Get one_per_post setting
     one_per_post = True
     if settings:
         one_per_post = getattr(settings, 'one_comment_per_post', True)
-    
+
     # Fetch inbox replies (comments only)
     try:
         inbox_candidates = reddit_client.fetch_inbox_replies(limit=25)
+        # Tag inbox candidates with HIGH priority (Phase A)
+        inbox_candidates = [replace(c, priority="HIGH") for c in inbox_candidates]
         comment_candidates.extend(inbox_candidates)
-        logger.info("inbox_candidates_fetched", count=len(inbox_candidates))
+        logger.info("inbox_candidates_fetched", count=len(inbox_candidates), priority="HIGH")
     except Exception as e:
         logger.error("inbox_fetch_failed", error=str(e))
         errors.append(f"Inbox fetch failed: {e}")
@@ -202,10 +209,11 @@ def sort_by_score_node(
     settings: Any
 ) -> Dict[str, Any]:
     """
-    Sort candidates by quality score with exploration logic.
+    Sort candidates by priority and quality score with exploration logic.
 
+    Phase A: Sort by (priority, quality_score) - HIGH priority first
     Implements exploration vs exploitation:
-    - (100 - exploration_rate)% of the time: sort by score descending
+    - (100 - exploration_rate)% of the time: sort by priority + score descending
     - exploration_rate% of the time: randomize top N to avoid patterns
 
     Args:
@@ -220,11 +228,13 @@ def sort_by_score_node(
     if not state.candidates:
         return {}
 
-    # Sort by score descending
+    # Phase A: Sort by priority first (HIGH before NORMAL), then by quality score
+    # Priority ordering: HIGH=0, NORMAL=1 (so HIGH comes first when sorted ascending)
+    priority_order = {"HIGH": 0, "NORMAL": 1}
     sorted_candidates = sorted(
         state.candidates,
-        key=lambda c: c.quality_score,
-        reverse=True
+        key=lambda c: (priority_order.get(c.priority, 1), -c.quality_score)
+        # Negative quality_score for descending order within same priority
     )
 
     # Apply exploration logic
@@ -248,11 +258,96 @@ def sort_by_score_node(
         logger.info(
             "candidates_sorted",
             count=len(sorted_candidates),
+            top_priority=sorted_candidates[0].priority,
             top_score=round(sorted_candidates[0].quality_score, 3),
             bottom_score=round(sorted_candidates[-1].quality_score, 3)
         )
 
     return {"candidates": sorted_candidates}
+
+
+def diversity_select_node(
+    state: Any,
+    settings: Any
+) -> Dict[str, Any]:
+    """
+    Apply diversity filtering to prevent clustering in same subreddit/post.
+
+    Phase B: Balanced distribution with flexibility
+    - Max 2 per subreddit (allow 3rd if quality_score > 0.75)
+    - Max 1 per post (strict - prevent spam)
+    - Greedy selection maintaining diversity
+
+    Args:
+        state: Current workflow state
+        settings: Application settings
+
+    Returns:
+        Dict with filtered candidates list
+    """
+    if not state.candidates:
+        return {}
+
+    max_per_subreddit = getattr(settings, 'max_per_subreddit', 2)
+    max_per_post = getattr(settings, 'max_per_post', 1)
+    quality_boost_threshold = getattr(settings, 'diversity_quality_boost_threshold', 0.75)
+
+    selected = []
+    subreddit_counts = {}
+    selected_post_ids = set()
+
+    for candidate in state.candidates:
+        subreddit = candidate.subreddit
+        post_id = getattr(candidate, 'post_id', '')  # Empty for posts
+        quality_score = candidate.quality_score
+
+        # Check post duplication (strict - max 1 per post)
+        if post_id and post_id in selected_post_ids:
+            logger.info(
+                "candidate_skipped_duplicate_post",
+                reddit_id=candidate.reddit_id,
+                post_id=post_id,
+                subreddit=subreddit
+            )
+            continue
+
+        # Check subreddit diversity (flexible - allow quality boost)
+        current_count = subreddit_counts.get(subreddit, 0)
+        if current_count >= max_per_subreddit:
+            # Allow 3rd+ if quality is exceptional
+            if quality_score >= quality_boost_threshold:
+                logger.info(
+                    "diversity_quality_boost",
+                    reddit_id=candidate.reddit_id,
+                    subreddit=subreddit,
+                    count=current_count,
+                    quality_score=round(quality_score, 3)
+                )
+            else:
+                logger.info(
+                    "candidate_skipped_subreddit_limit",
+                    reddit_id=candidate.reddit_id,
+                    subreddit=subreddit,
+                    count=current_count,
+                    max=max_per_subreddit
+                )
+                continue
+
+        # Accept candidate
+        selected.append(candidate)
+        subreddit_counts[subreddit] = current_count + 1
+        if post_id:
+            selected_post_ids.add(post_id)
+
+    logger.info(
+        "diversity_applied",
+        original=len(state.candidates),
+        selected=len(selected),
+        subreddits=len(subreddit_counts),
+        unique_posts=len(selected_post_ids)
+    )
+
+    return {"candidates": selected}
 
 
 def filter_candidates_node(
@@ -266,28 +361,46 @@ def filter_candidates_node(
     - Daily limit
     """
     filtered = []
-    
+    skipped_replied = 0
+    skipped_cooldown = 0
+
     for candidate in state.candidates:
         reddit_id = candidate.reddit_id
-        
+
         # Skip if already replied successfully
         if state_manager.has_replied(reddit_id):
-            logger.debug("skipping_already_replied", reddit_id=reddit_id)
+            logger.info(
+                "candidate_filtered",
+                filter_reason="already_replied",
+                reddit_id=reddit_id,
+                priority=candidate.priority,
+                quality_score=round(candidate.quality_score, 3)
+            )
+            skipped_replied += 1
             continue
-        
+
         # Skip if in cooldown
         if not state_manager.is_retryable(reddit_id):
-            logger.debug("skipping_in_cooldown", reddit_id=reddit_id)
+            logger.info(
+                "candidate_filtered",
+                filter_reason="in_cooldown",
+                reddit_id=reddit_id,
+                priority=candidate.priority,
+                quality_score=round(candidate.quality_score, 3)
+            )
+            skipped_cooldown += 1
             continue
-        
+
         filtered.append(candidate)
-    
+
     logger.info(
-        "candidates_filtered",
+        "candidates_filtered_summary",
         original=len(state.candidates),
-        remaining=len(filtered)
+        remaining=len(filtered),
+        skipped_replied=skipped_replied,
+        skipped_cooldown=skipped_cooldown
     )
-    
+
     return {"candidates": filtered}
 
 

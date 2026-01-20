@@ -56,14 +56,24 @@ class TestFetchNode:
         """Fetch node should return post and comment candidate pools."""
         from workflow.nodes import fetch_candidates_node
         from workflow.state import AgentState
-        
+        from services.reddit_client import CandidateComment
+
         mock_client = Mock()
         mock_client.fetch_inbox_replies.return_value = [
-            Mock(reddit_id="abc123", subreddit="sysadmin", body="Test comment")
+            CandidateComment(
+                comment=Mock(),
+                reddit_id="abc123",
+                subreddit="sysadmin",
+                body="Test comment",
+                author="testuser",
+                context_url="https://reddit.com/test",
+                post_title="Test post",
+                parent_id="t3_parent"
+            )
         ]
         mock_client.fetch_rising_posts_as_candidates.return_value = []
         mock_client.fetch_rising_candidates.return_value = []
-        
+
         state = AgentState(
             candidates=[],
             current_candidate=None,
@@ -71,12 +81,13 @@ class TestFetchNode:
             draft=None,
             errors=[]
         )
-        
+
         result = fetch_candidates_node(state, reddit_client=mock_client)
-        
-        # Fetch populates comment_candidates from inbox
+
+        # Fetch populates comment_candidates from inbox with HIGH priority
         assert len(result["comment_candidates"]) == 1
         assert result["comment_candidates"][0].reddit_id == "abc123"
+        assert result["comment_candidates"][0].priority == "HIGH"
 
 
 class TestFilterNode:
@@ -86,16 +97,39 @@ class TestFilterNode:
         """Filter out items we've already replied to."""
         from workflow.nodes import filter_candidates_node
         from workflow.state import AgentState
-        
+        from services.reddit_client import CandidateComment
+
         mock_state_manager = Mock()
         mock_state_manager.has_replied.side_effect = lambda x: x == "replied123"
         mock_state_manager.is_retryable.return_value = True
-        
+
         candidates = [
-            Mock(reddit_id="replied123", subreddit="test"),
-            Mock(reddit_id="new456", subreddit="test")
+            CandidateComment(
+                comment=Mock(),
+                reddit_id="replied123",
+                subreddit="test",
+                body="Test",
+                author="user1",
+                context_url="url1",
+                post_title="Post",
+                parent_id="parent1",
+                priority="NORMAL",
+                quality_score=0.5
+            ),
+            CandidateComment(
+                comment=Mock(),
+                reddit_id="new456",
+                subreddit="test",
+                body="Test",
+                author="user2",
+                context_url="url2",
+                post_title="Post",
+                parent_id="parent2",
+                priority="NORMAL",
+                quality_score=0.6
+            )
         ]
-        
+
         state = AgentState(
             candidates=candidates,
             current_candidate=None,
@@ -103,9 +137,9 @@ class TestFilterNode:
             draft=None,
             errors=[]
         )
-        
+
         result = filter_candidates_node(state, state_manager=mock_state_manager)
-        
+
         # Should filter out replied item
         assert len(result["candidates"]) == 1
         assert result["candidates"][0].reddit_id == "new456"
@@ -114,16 +148,39 @@ class TestFilterNode:
         """Filter out items in cooldown."""
         from workflow.nodes import filter_candidates_node
         from workflow.state import AgentState
-        
+        from services.reddit_client import CandidateComment
+
         mock_state_manager = Mock()
         mock_state_manager.has_replied.return_value = False
         mock_state_manager.is_retryable.side_effect = lambda x: x != "cooldown123"
-        
+
         candidates = [
-            Mock(reddit_id="cooldown123", subreddit="test"),
-            Mock(reddit_id="ready456", subreddit="test")
+            CandidateComment(
+                comment=Mock(),
+                reddit_id="cooldown123",
+                subreddit="test",
+                body="Test",
+                author="user1",
+                context_url="url1",
+                post_title="Post",
+                parent_id="parent1",
+                priority="NORMAL",
+                quality_score=0.4
+            ),
+            CandidateComment(
+                comment=Mock(),
+                reddit_id="ready456",
+                subreddit="test",
+                body="Test",
+                author="user2",
+                context_url="url2",
+                post_title="Post",
+                parent_id="parent2",
+                priority="NORMAL",
+                quality_score=0.7
+            )
         ]
-        
+
         state = AgentState(
             candidates=candidates,
             current_candidate=None,

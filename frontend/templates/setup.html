@@ -1,0 +1,862 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Wizard{% endblock %}
+
+{% block extra_head %}
+<!-- Alpine.js for interactivity -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+    .setup-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: var(--space-xl);
+    }
+
+    .setup-header {
+        text-align: center;
+        margin-bottom: var(--space-xl);
+    }
+
+    .setup-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 var(--space-sm) 0;
+    }
+
+    .setup-header p {
+        color: var(--text-muted);
+        font-size: 1.125rem;
+    }
+
+    /* Progress Steps */
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: var(--space-xl);
+        position: relative;
+    }
+
+    .progress-steps::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--border);
+        z-index: 0;
+    }
+
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-xs);
+        position: relative;
+        z-index: 1;
+        flex: 1;
+    }
+
+    .step-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--card-bg);
+        border: 2px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        color: var(--text-muted);
+        transition: all 0.3s;
+    }
+
+    .step.active .step-circle {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .step.completed .step-circle {
+        background: #059669;
+        border-color: #059669;
+        color: white;
+    }
+
+    .step-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    .step.active .step-label {
+        color: var(--text);
+        font-weight: 600;
+    }
+
+    /* Step Content */
+    .step-content {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-xl);
+        margin-bottom: var(--space-lg);
+    }
+
+    .step-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 var(--space-sm) 0;
+    }
+
+    .step-description {
+        color: var(--text-muted);
+        margin-bottom: var(--space-lg);
+    }
+
+    .form-group {
+        margin-bottom: var(--space-md);
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: var(--space-xs);
+    }
+
+    .form-label.required::after {
+        content: '*';
+        color: #dc2626;
+        margin-left: 4px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: var(--space-sm);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        background: var(--bg);
+        color: var(--text);
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .test-button {
+        margin-top: var(--space-sm);
+    }
+
+    .test-result {
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+    }
+
+    .test-result.success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #6ee7b7;
+    }
+
+    .test-result.error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    .test-result.testing {
+        background: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #93c5fd;
+    }
+
+    .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-md);
+        margin-top: var(--space-xl);
+    }
+
+    .success-screen {
+        text-align: center;
+        padding: var(--space-xl);
+    }
+
+    .success-icon {
+        font-size: 4rem;
+        margin-bottom: var(--space-md);
+    }
+
+    .success-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: var(--space-md);
+    }
+
+    .success-message {
+        color: var(--text-muted);
+        margin-bottom: var(--space-xl);
+        line-height: 1.6;
+    }
+
+    .next-steps {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-bottom: var(--space-xl);
+        text-align: left;
+    }
+
+    .next-steps h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin: 0 0 var(--space-md) 0;
+    }
+
+    .next-steps ol {
+        margin: 0;
+        padding-left: var(--space-lg);
+    }
+
+    .next-steps li {
+        margin-bottom: var(--space-sm);
+        color: var(--text-muted);
+    }
+
+    .next-steps code {
+        background: var(--card-bg);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="setup-container" x-data="setupWizard()">
+    <div class="setup-header">
+        <h1>Reddit Agent Setup Wizard</h1>
+        <p>Let's configure your Reddit engagement agent in 4 easy steps</p>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+        <div class="step" :class="{ active: currentStep === 1, completed: currentStep > 1 }">
+            <div class="step-circle">
+                <span x-show="currentStep <= 1">1</span>
+                <span x-show="currentStep > 1">✓</span>
+            </div>
+            <div class="step-label">Reddit API</div>
+        </div>
+        <div class="step" :class="{ active: currentStep === 2, completed: currentStep > 2 }">
+            <div class="step-circle">
+                <span x-show="currentStep <= 2">2</span>
+                <span x-show="currentStep > 2">✓</span>
+            </div>
+            <div class="step-label">LLM Keys</div>
+        </div>
+        <div class="step" :class="{ active: currentStep === 3, completed: currentStep > 3 }">
+            <div class="step-circle">
+                <span x-show="currentStep <= 3">3</span>
+                <span x-show="currentStep > 3">✓</span>
+            </div>
+            <div class="step-label">Notifications</div>
+        </div>
+        <div class="step" :class="{ active: currentStep === 4, completed: currentStep > 4 }">
+            <div class="step-circle">
+                <span x-show="currentStep <= 4">4</span>
+                <span x-show="currentStep > 4">✓</span>
+            </div>
+            <div class="step-label">Safety Limits</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Reddit API -->
+    <div x-show="currentStep === 1" x-cloak class="step-content">
+        <h2 class="step-title">Step 1: Reddit API Credentials</h2>
+        <p class="step-description">
+            Enter your Reddit API credentials. You can create an app at
+            <a href="https://www.reddit.com/prefs/apps" target="_blank">reddit.com/prefs/apps</a>
+        </p>
+
+        <div class="form-group">
+            <label class="form-label required">Client ID</label>
+            <input type="text" class="form-input" x-model="config.REDDIT_CLIENT_ID" placeholder="Enter Reddit app client ID">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Client Secret</label>
+            <input type="password" class="form-input" x-model="config.REDDIT_CLIENT_SECRET" placeholder="Enter Reddit app client secret">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Username</label>
+            <input type="text" class="form-input" x-model="config.REDDIT_USERNAME" placeholder="Enter your Reddit username">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Password</label>
+            <input type="password" class="form-input" x-model="config.REDDIT_PASSWORD" placeholder="Enter your Reddit password">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">User Agent</label>
+            <input type="text" class="form-input" x-model="config.REDDIT_USER_AGENT"
+                   placeholder="android:com.yourname.app:v2.1 (by /u/YourUsername)">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">Format: platform:appname:version (by /u/username)</small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Allowed Subreddits (comma-separated)</label>
+            <input type="text" class="form-input" x-model="config.ALLOWED_SUBREDDITS"
+                   placeholder="sysadmin,learnpython,startups">
+        </div>
+
+        <button @click="testReddit()" class="btn btn-secondary test-button" :disabled="testingReddit">
+            <span x-show="!testingReddit">Test Connection</span>
+            <span x-show="testingReddit">Testing...</span>
+        </button>
+
+        <div x-show="redditTestResult" class="test-result" :class="redditTestSuccess ? 'success' : 'error'">
+            <span x-text="redditTestResult"></span>
+        </div>
+    </div>
+
+    <!-- Step 2: LLM Keys -->
+    <div x-show="currentStep === 2" x-cloak class="step-content">
+        <h2 class="step-title">Step 2: LLM API Keys</h2>
+        <p class="step-description">
+            Configure at least one LLM provider. Gemini is recommended for best results.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label">Gemini API Key (Recommended)</label>
+            <input type="password" class="form-input" x-model="config.GEMINI_API_KEY"
+                   placeholder="Enter Gemini API key">
+            <button @click="testGemini()" class="btn btn-secondary test-button"
+                    :disabled="!config.GEMINI_API_KEY || testingGemini">
+                <span x-show="!testingGemini">Test Gemini</span>
+                <span x-show="testingGemini">Testing...</span>
+            </button>
+            <div x-show="geminiTestResult" class="test-result" :class="geminiTestSuccess ? 'success' : 'error'">
+                <span x-text="geminiTestResult"></span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">OpenAI API Key (Optional)</label>
+            <input type="password" class="form-input" x-model="config.OPENAI_API_KEY"
+                   placeholder="Enter OpenAI API key">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Anthropic API Key (Optional)</label>
+            <input type="password" class="form-input" x-model="config.ANTHROPIC_API_KEY"
+                   placeholder="Enter Anthropic API key">
+        </div>
+
+        <div x-show="!hasLLMKey()" class="test-result error">
+            At least one LLM API key is required to continue
+        </div>
+    </div>
+
+    <!-- Step 3: Notifications -->
+    <div x-show="currentStep === 3" x-cloak class="step-content">
+        <h2 class="step-title">Step 3: Notification Settings</h2>
+        <p class="step-description">
+            Configure how you'll receive approval notifications for draft comments.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label required">Notification Type</label>
+            <select class="form-input" x-model="config.NOTIFICATION_TYPE">
+                <option value="">Select notification type</option>
+                <option value="slack">Slack</option>
+                <option value="telegram">Telegram</option>
+                <option value="webhook">Generic Webhook</option>
+            </select>
+        </div>
+
+        <!-- Slack Fields -->
+        <template x-if="config.NOTIFICATION_TYPE === 'slack'">
+            <div>
+                <div class="form-group">
+                    <label class="form-label required">Slack Webhook URL</label>
+                    <input type="text" class="form-input" x-model="config.SLACK_WEBHOOK_URL"
+                           placeholder="https://hooks.slack.com/services/...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Slack Channel (optional)</label>
+                    <input type="text" class="form-input" x-model="config.SLACK_CHANNEL"
+                           placeholder="#reddit-agent">
+                </div>
+                <button @click="testSlack()" class="btn btn-secondary test-button"
+                        :disabled="!config.SLACK_WEBHOOK_URL || testingSlack">
+                    <span x-show="!testingSlack">Test Slack</span>
+                    <span x-show="testingSlack">Testing...</span>
+                </button>
+                <div x-show="slackTestResult" class="test-result" :class="slackTestSuccess ? 'success' : 'error'">
+                    <span x-text="slackTestResult"></span>
+                </div>
+            </div>
+        </template>
+
+        <!-- Telegram Fields -->
+        <template x-if="config.NOTIFICATION_TYPE === 'telegram'">
+            <div>
+                <div class="form-group">
+                    <label class="form-label required">Telegram Bot Token</label>
+                    <input type="password" class="form-input" x-model="config.TELEGRAM_BOT_TOKEN"
+                           placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Telegram Chat ID</label>
+                    <input type="text" class="form-input" x-model="config.TELEGRAM_CHAT_ID"
+                           placeholder="123456789">
+                </div>
+                <button @click="testTelegram()" class="btn btn-secondary test-button"
+                        :disabled="!config.TELEGRAM_BOT_TOKEN || !config.TELEGRAM_CHAT_ID || testingTelegram">
+                    <span x-show="!testingTelegram">Test Telegram</span>
+                    <span x-show="testingTelegram">Testing...</span>
+                </button>
+                <div x-show="telegramTestResult" class="test-result" :class="telegramTestSuccess ? 'success' : 'error'">
+                    <span x-text="telegramTestResult"></span>
+                </div>
+            </div>
+        </template>
+
+        <!-- Webhook Fields -->
+        <template x-if="config.NOTIFICATION_TYPE === 'webhook'">
+            <div>
+                <div class="form-group">
+                    <label class="form-label required">Webhook URL</label>
+                    <input type="text" class="form-input" x-model="config.WEBHOOK_URL"
+                           placeholder="https://your-server.com/webhook">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Webhook Secret (optional)</label>
+                    <input type="password" class="form-input" x-model="config.WEBHOOK_SECRET"
+                           placeholder="Secret for HMAC signature">
+                </div>
+            </div>
+        </template>
+
+        <div class="form-group">
+            <label class="form-label required">Public URL (for approval callbacks)</label>
+            <input type="text" class="form-input" x-model="config.PUBLIC_URL"
+                   placeholder="https://your-public-url.com or ngrok URL">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Must be publicly accessible. Use ngrok for local development.
+            </small>
+        </div>
+    </div>
+
+    <!-- Step 4: Safety Limits -->
+    <div x-show="currentStep === 4" x-cloak class="step-content">
+        <h2 class="step-title">Step 4: Safety Limits</h2>
+        <p class="step-description">
+            Configure safety limits to prevent spam and shadowban risk. Defaults are recommended.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label required">Max Comments Per Day (1-10)</label>
+            <input type="number" class="form-input" x-model.number="config.MAX_COMMENTS_PER_DAY"
+                   min="1" max="10" placeholder="8">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Recommended: 8 (hard daily limit)
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Max Comments Per Run (1-5)</label>
+            <input type="number" class="form-input" x-model.number="config.MAX_COMMENTS_PER_RUN"
+                   min="1" max="5" placeholder="3">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Recommended: 3 (per workflow execution)
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Shadowban Risk Threshold (0.0-1.0)</label>
+            <input type="number" class="form-input" x-model.number="config.SHADOWBAN_RISK_THRESHOLD"
+                   min="0" max="1" step="0.1" placeholder="0.7">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Recommended: 0.7 (higher = more cautious)
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Cooldown Period (hours)</label>
+            <input type="number" class="form-input" x-model.number="config.COOLDOWN_PERIOD_HOURS"
+                   min="1" max="168" placeholder="24">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Recommended: 24 (time before replying to same post again)
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Post Reply Ratio (0.0-1.0)</label>
+            <input type="number" class="form-input" x-model.number="config.POST_REPLY_RATIO"
+                   min="0" max="1" step="0.1" placeholder="0.3">
+            <small style="color: var(--text-muted); font-size: 0.75rem;">
+                Recommended: 0.3 (30% posts, 70% comments)
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Max Post Replies Per Run</label>
+            <input type="number" class="form-input" x-model.number="config.MAX_POST_REPLIES_PER_RUN"
+                   min="0" max="5" placeholder="1">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label required">Max Comment Replies Per Run</label>
+            <input type="number" class="form-input" x-model.number="config.MAX_COMMENT_REPLIES_PER_RUN"
+                   min="0" max="5" placeholder="2">
+        </div>
+    </div>
+
+    <!-- Success Screen -->
+    <div x-show="currentStep === 5" x-cloak class="success-screen">
+        <div class="success-icon">✓</div>
+        <h2 class="success-title">Setup Complete!</h2>
+        <p class="success-message">
+            Your Reddit engagement agent is now configured and ready to use.
+        </p>
+
+        <div class="next-steps">
+            <h3>Next Steps:</h3>
+            <ol>
+                <li>
+                    Set admin password:
+                    <code>python -c "import bcrypt; print(bcrypt.hashpw(b'your-password', bcrypt.gensalt(12)).decode())"</code>
+                    <br>Then add the hash to <code>ADMIN_PASSWORD_HASH</code> in <code>.env</code>
+                </li>
+                <li>
+                    Start the callback server:
+                    <code>python main.py server</code>
+                </li>
+                <li>
+                    Run the agent (in another terminal):
+                    <code>python main.py run --once</code>
+                </li>
+                <li>
+                    Access admin dashboard at:
+                    <code>http://localhost:8000/admin/login</code>
+                </li>
+            </ol>
+        </div>
+
+        <div x-show="setupError" class="test-result error" style="margin-bottom: var(--space-md);">
+            <span x-text="setupError"></span>
+        </div>
+
+        <a href="/admin/login" class="btn btn-primary">Go to Admin Login</a>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div x-show="currentStep < 5" class="nav-buttons">
+        <button @click="prevStep()" class="btn btn-secondary" x-show="currentStep > 1">
+            ← Previous
+        </button>
+        <div style="flex: 1;"></div>
+        <button @click="nextStep()" class="btn btn-primary" :disabled="!canProceed()">
+            <span x-show="currentStep < 4">Next →</span>
+            <span x-show="currentStep === 4">
+                <span x-show="!completing">Complete Setup</span>
+                <span x-show="completing">Completing...</span>
+            </span>
+        </button>
+    </div>
+</div>
+
+<script>
+function setupWizard() {
+    return {
+        currentStep: 1,
+        completing: false,
+        setupError: '',
+
+        // Configuration data
+        config: {
+            // Step 1: Reddit
+            REDDIT_CLIENT_ID: '',
+            REDDIT_CLIENT_SECRET: '',
+            REDDIT_USERNAME: '',
+            REDDIT_PASSWORD: '',
+            REDDIT_USER_AGENT: '',
+            ALLOWED_SUBREDDITS: '',
+
+            // Step 2: LLM
+            GEMINI_API_KEY: '',
+            OPENAI_API_KEY: '',
+            ANTHROPIC_API_KEY: '',
+
+            // Step 3: Notifications
+            NOTIFICATION_TYPE: '',
+            SLACK_WEBHOOK_URL: '',
+            SLACK_CHANNEL: '',
+            TELEGRAM_BOT_TOKEN: '',
+            TELEGRAM_CHAT_ID: '',
+            WEBHOOK_URL: '',
+            WEBHOOK_SECRET: '',
+            PUBLIC_URL: '',
+
+            // Step 4: Safety Limits (with defaults)
+            MAX_COMMENTS_PER_DAY: 8,
+            MAX_COMMENTS_PER_RUN: 3,
+            SHADOWBAN_RISK_THRESHOLD: 0.7,
+            COOLDOWN_PERIOD_HOURS: 24,
+            POST_REPLY_RATIO: 0.3,
+            MAX_POST_REPLIES_PER_RUN: 1,
+            MAX_COMMENT_REPLIES_PER_RUN: 2
+        },
+
+        // Testing state
+        testingReddit: false,
+        redditTestResult: '',
+        redditTestSuccess: false,
+
+        testingGemini: false,
+        geminiTestResult: '',
+        geminiTestSuccess: false,
+
+        testingSlack: false,
+        slackTestResult: '',
+        slackTestSuccess: false,
+
+        testingTelegram: false,
+        telegramTestResult: '',
+        telegramTestSuccess: false,
+
+        async testReddit() {
+            this.testingReddit = true;
+            this.redditTestResult = 'Testing connection...';
+            this.redditTestSuccess = false;
+
+            try {
+                const response = await fetch('/api/setup/test-reddit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: this.config.REDDIT_CLIENT_ID,
+                        client_secret: this.config.REDDIT_CLIENT_SECRET,
+                        username: this.config.REDDIT_USERNAME,
+                        password: this.config.REDDIT_PASSWORD,
+                        user_agent: this.config.REDDIT_USER_AGENT
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.redditTestSuccess = true;
+                    this.redditTestResult = `✓ Connected as u/${data.username} (${data.karma} karma)`;
+                } else {
+                    this.redditTestSuccess = false;
+                    this.redditTestResult = `✗ ${data.error}`;
+                }
+            } catch (error) {
+                this.redditTestSuccess = false;
+                this.redditTestResult = `✗ ${error.message}`;
+            } finally {
+                this.testingReddit = false;
+            }
+        },
+
+        async testGemini() {
+            this.testingGemini = true;
+            this.geminiTestResult = 'Testing API key...';
+            this.geminiTestSuccess = false;
+
+            try {
+                const response = await fetch('/api/setup/test-gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: this.config.GEMINI_API_KEY
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.geminiTestSuccess = true;
+                    this.geminiTestResult = '✓ Gemini API key is valid';
+                } else {
+                    this.geminiTestSuccess = false;
+                    this.geminiTestResult = `✗ ${data.error}`;
+                }
+            } catch (error) {
+                this.geminiTestSuccess = false;
+                this.geminiTestResult = `✗ ${error.message}`;
+            } finally {
+                this.testingGemini = false;
+            }
+        },
+
+        async testSlack() {
+            this.testingSlack = true;
+            this.slackTestResult = 'Sending test message...';
+            this.slackTestSuccess = false;
+
+            try {
+                const response = await fetch('/api/setup/test-slack', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        webhook_url: this.config.SLACK_WEBHOOK_URL
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.slackTestSuccess = true;
+                    this.slackTestResult = '✓ Test message sent to Slack';
+                } else {
+                    this.slackTestSuccess = false;
+                    this.slackTestResult = `✗ ${data.error}`;
+                }
+            } catch (error) {
+                this.slackTestSuccess = false;
+                this.slackTestResult = `✗ ${error.message}`;
+            } finally {
+                this.testingSlack = false;
+            }
+        },
+
+        async testTelegram() {
+            this.testingTelegram = true;
+            this.telegramTestResult = 'Sending test message...';
+            this.telegramTestSuccess = false;
+
+            try {
+                const response = await fetch('/api/setup/test-telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bot_token: this.config.TELEGRAM_BOT_TOKEN,
+                        chat_id: this.config.TELEGRAM_CHAT_ID
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.telegramTestSuccess = true;
+                    this.telegramTestResult = '✓ Test message sent to Telegram';
+                } else {
+                    this.telegramTestSuccess = false;
+                    this.telegramTestResult = `✗ ${data.error}`;
+                }
+            } catch (error) {
+                this.telegramTestSuccess = false;
+                this.telegramTestResult = `✗ ${error.message}`;
+            } finally {
+                this.testingTelegram = false;
+            }
+        },
+
+        hasLLMKey() {
+            return !!(this.config.GEMINI_API_KEY || this.config.OPENAI_API_KEY || this.config.ANTHROPIC_API_KEY);
+        },
+
+        canProceed() {
+            if (this.currentStep === 1) {
+                return !!(
+                    this.config.REDDIT_CLIENT_ID &&
+                    this.config.REDDIT_CLIENT_SECRET &&
+                    this.config.REDDIT_USERNAME &&
+                    this.config.REDDIT_PASSWORD &&
+                    this.config.REDDIT_USER_AGENT &&
+                    this.config.ALLOWED_SUBREDDITS &&
+                    this.redditTestSuccess
+                );
+            }
+
+            if (this.currentStep === 2) {
+                return this.hasLLMKey();
+            }
+
+            if (this.currentStep === 3) {
+                return !!(
+                    this.config.NOTIFICATION_TYPE &&
+                    this.config.PUBLIC_URL &&
+                    (
+                        (this.config.NOTIFICATION_TYPE === 'slack' && this.config.SLACK_WEBHOOK_URL) ||
+                        (this.config.NOTIFICATION_TYPE === 'telegram' && this.config.TELEGRAM_BOT_TOKEN && this.config.TELEGRAM_CHAT_ID) ||
+                        (this.config.NOTIFICATION_TYPE === 'webhook' && this.config.WEBHOOK_URL)
+                    )
+                );
+            }
+
+            if (this.currentStep === 4) {
+                return !!(
+                    this.config.MAX_COMMENTS_PER_DAY &&
+                    this.config.MAX_COMMENTS_PER_RUN &&
+                    this.config.SHADOWBAN_RISK_THRESHOLD !== undefined &&
+                    this.config.COOLDOWN_PERIOD_HOURS &&
+                    this.config.POST_REPLY_RATIO !== undefined
+                );
+            }
+
+            return true;
+        },
+
+        prevStep() {
+            if (this.currentStep > 1) {
+                this.currentStep--;
+            }
+        },
+
+        async nextStep() {
+            if (this.currentStep < 4) {
+                this.currentStep++;
+            } else if (this.currentStep === 4) {
+                await this.completeSetup();
+            }
+        },
+
+        async completeSetup() {
+            this.completing = true;
+            this.setupError = '';
+
+            try {
+                const response = await fetch('/api/setup/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.config)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.currentStep = 5;
+                    if (!data.migrations_success) {
+                        this.setupError = data.migrations_message;
+                    }
+                } else {
+                    this.setupError = data.error;
+                }
+            } catch (error) {
+                this.setupError = error.message;
+            } finally {
+                this.completing = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

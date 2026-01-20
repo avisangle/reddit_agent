@@ -128,8 +128,8 @@ class Settings(BaseSettings):
     score_problem_keywords: str = "issue,problem,error,stuck,struggling,trouble"
 
     # Exploration vs Exploitation
-    score_exploration_rate: float = 0.15  # 15% random selection
-    score_top_n_random: int = 3  # Randomize top 3
+    score_exploration_rate: float = 0.25  # 25% random selection (Phase B: increased for variety)
+    score_top_n_random: int = 5  # Randomize top 5 (Phase B: increased from 3)
 
     # Historical Learning System (Phase 3)
     learning_enabled: bool = True  # Enable historical learning
@@ -147,6 +147,23 @@ class Settings(BaseSettings):
     # Engagement Tracking (Phase 4)
     engagement_check_enabled: bool = True  # Enable engagement tracking
     engagement_check_delay_hours: int = 24  # Check engagement after 24 hours
+
+    # Inbox Priority System (Phase A)
+    inbox_priority_enabled: bool = True  # Enable inbox priority over rising content
+    inbox_priority_min_score: float = 0.35  # Minimum quality score for inbox prioritization
+    inbox_cooldown_hours: int = 6  # Cooldown for failed inbox replies (more forgiving)
+    rising_cooldown_hours: int = 24  # Cooldown for failed rising content (standard)
+
+    # Subreddit Diversity System (Phase B)
+    diversity_enabled: bool = True  # Enable diversity filtering
+    max_per_subreddit: int = 2  # Maximum drafts per subreddit per run (flexible)
+    max_per_post: int = 1  # Maximum drafts per post (strict - prevents spam)
+    diversity_quality_boost_threshold: float = 0.75  # Allow 3rd+ from subreddit if quality exceeds this
+
+    # Admin Authentication (Phase 1 - Frontend)
+    admin_password_hash: str = ""  # Bcrypt hash of admin password (generate with: python -c "import bcrypt; print(bcrypt.hashpw(b'password', bcrypt.gensalt(12)).decode())")
+    admin_jwt_secret: str = ""  # Secret for JWT signing (generate with: python -c "import secrets; print(secrets.token_urlsafe(32))")
+    admin_session_hours: int = 24  # Session validity in hours
 
     @field_validator('reddit_user_agent')
     @classmethod

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Visualizer{% endblock %}
+
+{% block extra_head %}
+<!-- Alpine.js for interactivity -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+    .workflow-container {
+        padding: var(--space-lg);
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .workflow-header {
+        margin-bottom: var(--space-xl);
+    }
+
+    .workflow-svg-container {
+        background: var(--card-bg);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        padding: var(--space-lg);
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    .workflow-node:hover rect {
+        filter: brightness(0.95);
+        stroke-width: 3;
+    }
+
+    .legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--space-sm);
+        margin-bottom: var(--space-lg);
+        padding: var(--space-md);
+        background: var(--card-bg);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-size: 0.875rem;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--radius-sm);
+        border: 2px solid var(--text);
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: var(--space-md);
+    }
+
+    .modal-content {
+        background: var(--card-bg);
+        border-radius: var(--radius-md);
+        padding: var(--space-xl);
+        max-width: 600px;
+        width: 100%;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: var(--space-md);
+    }
+
+    .modal-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-muted);
+        padding: 0;
+        line-height: 1;
+    }
+
+    .modal-close:hover {
+        color: var(--text);
+    }
+
+    .modal-description {
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin-bottom: var(--space-md);
+    }
+
+    .modal-metadata {
+        display: grid;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: var(--bg);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+    }
+
+    .metadata-row {
+        display: flex;
+        gap: var(--space-sm);
+        font-size: 0.875rem;
+    }
+
+    .metadata-label {
+        font-weight: 600;
+        color: var(--text);
+        min-width: 80px;
+    }
+
+    .metadata-value {
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--space-md);
+        margin-bottom: var(--space-xl);
+    }
+
+    .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+    }
+
+    .stat-card h3 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin: 0 0 var(--space-xs) 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="workflow-container" x-data="workflowViewer()">
+    <header class="workflow-header" style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+            <h1>Workflow Visualizer</h1>
+            <p style="color: var(--text-muted); font-size: 1.125rem; margin: var(--space-sm) 0;">
+                Interactive diagram of the 13-node LangGraph pipeline
+            </p>
+        </div>
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="/admin/dashboard" class="btn btn-secondary">← Back to Dashboard</a>
+            <a href="/admin/logout" class="btn btn-secondary">Logout</a>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Nodes</h3>
+            <p class="stat-value">{{ metadata.total_nodes }}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Edges</h3>
+            <p class="stat-value">{{ metadata.edges|length }}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Node Types</h3>
+            <p class="stat-value">{{ metadata.node_types|length }}</p>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fef3c7; border-color: #92400e;"></div>
+            <span>Fetch</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fed7aa; border-color: #c2410c;"></div>
+            <span>Filter</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fde68a; border-color: #ca8a04;"></div>
+            <span>Sort</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fca5a5; border-color: #dc2626;"></div>
+            <span>Conditional</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #d1fae5; border-color: #059669;"></div>
+            <span>Process</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #dbeafe; border-color: #2563eb;"></div>
+            <span>AI</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e9d5ff; border-color: #9333ea;"></div>
+            <span>Notify</span>
+        </div>
+    </div>
+
+    <!-- SVG Diagram -->
+    <div class="workflow-svg-container">
+        <div @click="handleNodeClick($event)">
+            {{ svg_content|safe }}
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div x-show="showModal"
+         x-cloak
+         class="modal-overlay"
+         @click.self="showModal = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="modal-content"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95">
+            <div class="modal-header">
+                <h2 class="modal-title" x-text="selectedNode.label"></h2>
+                <button class="modal-close" @click="showModal = false">&times;</button>
+            </div>
+            <p class="modal-description" x-text="selectedNode.description"></p>
+            <div class="modal-metadata">
+                <div class="metadata-row">
+                    <span class="metadata-label">Node ID:</span>
+                    <span class="metadata-value" x-text="selectedNode.id"></span>
+                </div>
+                <div class="metadata-row">
+                    <span class="metadata-label">Type:</span>
+                    <span class="metadata-value" x-text="selectedNode.type"></span>
+                </div>
+                <div class="metadata-row" x-show="selectedNode.inputs && selectedNode.inputs.length > 0">
+                    <span class="metadata-label">Inputs:</span>
+                    <span class="metadata-value" x-text="selectedNode.inputs ? selectedNode.inputs.join(', ') : 'None'"></span>
+                </div>
+                <div class="metadata-row" x-show="selectedNode.outputs && selectedNode.outputs.length > 0">
+                    <span class="metadata-label">Outputs:</span>
+                    <span class="metadata-value" x-text="selectedNode.outputs ? selectedNode.outputs.join(', ') : 'None'"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documentation -->
+    <div class="card" style="margin-top: var(--space-xl);">
+        <h2>How to Read This Diagram</h2>
+        <ul style="line-height: 1.8; color: var(--text-muted);">
+            <li><strong>Solid arrows</strong> - Linear flow between nodes</li>
+            <li><strong>Dashed red arrows</strong> - Conditional branches (if/else logic)</li>
+            <li><strong>Dashed purple arrow</strong> - Loop back to previous node</li>
+            <li><strong>Click any node</strong> - View detailed description and metadata</li>
+            <li><strong>Node colors</strong> - Indicate node type (fetch, filter, AI, etc.)</li>
+        </ul>
+    </div>
+
+    <div class="callout callout-info" style="margin-top: var(--space-lg);">
+        <p>
+            <strong>Workflow Flow:</strong> The agent fetches candidates from Reddit, applies quality scoring,
+            filters and sorts them, then generates drafts for human approval. After approval, drafts are
+            auto-published to Reddit. The loop continues until the daily limit is reached or no more candidates remain.
+        </p>
+    </div>
+</div>
+
+<script>
+function workflowViewer() {
+    return {
+        showModal: false,
+        selectedNode: {
+            id: '',
+            label: '',
+            description: '',
+            type: '',
+            inputs: [],
+            outputs: []
+        },
+        nodeMetadata: {{ metadata.nodes|tojson }},
+
+        handleNodeClick(event) {
+            // Find the clicked workflow node
+            const nodeElement = event.target.closest('.workflow-node');
+            if (!nodeElement) return;
+
+            const nodeId = nodeElement.getAttribute('data-node-id');
+            const metadata = this.nodeMetadata[nodeId];
+
+            if (metadata) {
+                this.selectedNode = {
+                    id: nodeId,
+                    label: metadata.label || nodeId,
+                    description: metadata.description || 'No description available',
+                    type: metadata.node_type || 'Unknown',
+                    inputs: metadata.inputs || [],
+                    outputs: metadata.outputs || []
+                };
+                this.showModal = true;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1063 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block extra_head %}
+<!-- Alpine.js for interactivity -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+    .env-editor-container {
+        padding: var(--space-lg);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: var(--space-xl);
+    }
+
+    .field-group {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-bottom: var(--space-lg);
+    }
+
+    .field-group h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 var(--space-md) 0;
+        padding-bottom: var(--space-sm);
+        border-bottom: 2px solid var(--primary);
+    }
+
+    .form-field {
+        margin-bottom: var(--space-md);
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: var(--space-xs);
+    }
+
+    .form-label.required::after {
+        content: " *";
+        color: #dc2626;
+    }
+
+    .form-input-wrapper {
+        position: relative;
+        display: flex;
+        gap: var(--space-xs);
+    }
+
+    .form-input {
+        flex: 1;
+        padding: var(--space-sm);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        background: var(--bg);
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+    }
+
+    .form-input.error {
+        border-color: #dc2626;
+    }
+
+    .form-error {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: var(--space-xs);
+    }
+
+    .reveal-btn {
+        padding: var(--space-sm) var(--space-md);
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .reveal-btn:hover {
+        background: var(--bg);
+        color: var(--text);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-xl);
+        padding-top: var(--space-lg);
+        border-top: 1px solid var(--border);
+    }
+
+    .backups-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-top: var(--space-xl);
+    }
+
+    .backup-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-sm);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .backup-item:last-child {
+        border-bottom: none;
+    }
+
+    .backup-info {
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+    }
+
+    .backup-timestamp {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: var(--space-md);
+    }
+
+    .modal-content {
+        background: var(--card-bg);
+        border-radius: var(--radius-md);
+        padding: var(--space-xl);
+        max-width: 700px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-md);
+    }
+
+    .modal-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-muted);
+        padding: 0;
+        line-height: 1;
+    }
+
+    .modal-close:hover {
+        color: var(--text);
+    }
+
+    .diff-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: var(--space-md);
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+    }
+
+    .diff-table th,
+    .diff-table td {
+        padding: var(--space-sm);
+        border: 1px solid var(--border);
+        text-align: left;
+    }
+
+    .diff-table th {
+        background: var(--bg);
+        font-weight: 600;
+    }
+
+    .diff-changed {
+        background: #fef3c7;
+    }
+
+    .diff-unchanged {
+        opacity: 0.5;
+    }
+
+    .alert {
+        padding: var(--space-md);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-lg);
+    }
+
+    .alert-error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    .alert-warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+
+    .alert-success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #6ee7b7;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+        position: fixed;
+        top: var(--space-lg);
+        right: var(--space-lg);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+        max-width: 400px;
+    }
+
+    .toast {
+        padding: var(--space-md);
+        border-radius: var(--radius-md);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        animation: slideInRight 0.3s ease-out;
+    }
+
+    .toast.hiding {
+        animation: slideOutRight 0.3s ease-out forwards;
+    }
+
+    .toast-success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #6ee7b7;
+    }
+
+    .toast-error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    .toast-warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="env-editor-container" x-data="envEditor()">
+    <header class="editor-header">
+        <div>
+            <h1>Settings</h1>
+            <p style="color: var(--text-muted); margin: var(--space-xs) 0 0 0;">
+                Edit environment variables with validation and automatic backups
+            </p>
+        </div>
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="/admin/dashboard" class="btn btn-secondary">← Back to Dashboard</a>
+            <a href="/admin/logout" class="btn btn-secondary">Logout</a>
+        </div>
+    </header>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container">
+        <!-- Success Toast -->
+        <div x-show="successMessage"
+             x-cloak
+             class="toast toast-success"
+             :class="{ 'hiding': hidingSuccess }"
+             x-transition:enter="slideInRight"
+             x-transition:leave="slideOutRight">
+            <span style="font-size: 1.25rem;">✓</span>
+            <span x-text="successMessage"></span>
+        </div>
+
+        <!-- Error Toast -->
+        <div x-show="errorMessage"
+             x-cloak
+             class="toast toast-error"
+             :class="{ 'hiding': hidingError }"
+             x-transition:enter="slideInRight"
+             x-transition:leave="slideOutRight">
+            <span style="font-size: 1.25rem;">✗</span>
+            <span x-text="errorMessage"></span>
+        </div>
+
+        <!-- Restart Required Toast -->
+        <div x-show="restartRequired"
+             x-cloak
+             class="toast toast-warning"
+             :class="{ 'hiding': hidingRestart }">
+            <span style="font-size: 1.25rem;">⚠️</span>
+            <div>
+                <strong>Restart Required</strong><br>
+                <span style="font-size: 0.875rem;">Changes saved. Restart: <code>python main.py server</code></span>
+            </div>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Reddit API Group -->
+    <div class="field-group">
+        <h2>Reddit API</h2>
+        <template x-for="field in ['REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET', 'REDDIT_USERNAME', 'REDDIT_PASSWORD', 'REDDIT_USER_AGENT']" :key="field">
+            <div class="form-field">
+                <label class="form-label" :class="{ required: isRequired(field) }" x-text="getLabel(field)"></label>
+                <div class="form-input-wrapper">
+                    <input
+                        :type="isSecret(field) && !revealed[field] ? 'password' : 'text'"
+                        :name="field"
+                        x-model="formData[field]"
+                        class="form-input"
+                        :placeholder="getPlaceholder(field)"
+                        @input="validateField(field)"
+                    />
+                    <button x-show="isSecret(field)" @click="toggleReveal(field)" class="reveal-btn" type="button">
+                        <span x-text="revealed[field] ? 'Hide' : 'Reveal'"></span>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Subreddits Group -->
+    <div class="field-group">
+        <h2>Subreddits</h2>
+        <div class="form-field">
+            <label class="form-label required">Allowed Subreddits</label>
+            <input
+                type="text"
+                name="ALLOWED_SUBREDDITS"
+                x-model="formData.ALLOWED_SUBREDDITS"
+                class="form-input"
+                placeholder="sysadmin,learnpython,startups"
+            />
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-xs);">
+                Comma-separated list of subreddit names (without r/)
+            </p>
+        </div>
+    </div>
+
+    <!-- LLM Keys Group -->
+    <div class="field-group">
+        <h2>LLM API Keys</h2>
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: var(--space-md);">
+            At least one LLM key is required
+        </p>
+        <template x-for="field in ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY']" :key="field">
+            <div class="form-field">
+                <label class="form-label" x-text="getLabel(field)"></label>
+                <div class="form-input-wrapper">
+                    <input
+                        :type="isSecret(field) && !revealed[field] ? 'password' : 'text'"
+                        :name="field"
+                        x-model="formData[field]"
+                        class="form-input"
+                        :placeholder="'AIza...xyz (optional)'"
+                    />
+                    <button @click="toggleReveal(field)" class="reveal-btn" type="button">
+                        <span x-text="revealed[field] ? 'Hide' : 'Reveal'"></span>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Notifications Group -->
+    <div class="field-group">
+        <h2>Notifications</h2>
+        <div class="form-field">
+            <label class="form-label required">Notification Type</label>
+            <select name="NOTIFICATION_TYPE" x-model="formData.NOTIFICATION_TYPE" class="form-input">
+                <option value="slack">Slack</option>
+                <option value="telegram">Telegram</option>
+                <option value="webhook">Webhook</option>
+            </select>
+        </div>
+
+        <!-- Slack-specific fields -->
+        <template x-if="formData.NOTIFICATION_TYPE === 'slack'">
+            <div>
+                <div class="form-field">
+                    <label class="form-label required">Slack Webhook URL</label>
+                    <div class="form-input-wrapper">
+                        <input
+                            :type="isSecret('SLACK_WEBHOOK_URL') && !revealed['SLACK_WEBHOOK_URL'] ? 'password' : 'text'"
+                            name="SLACK_WEBHOOK_URL"
+                            x-model="formData.SLACK_WEBHOOK_URL"
+                            class="form-input"
+                            placeholder="https://hooks.slack.com/services/..."
+                        />
+                        <button @click="toggleReveal('SLACK_WEBHOOK_URL')" class="reveal-btn" type="button">
+                            <span x-text="revealed['SLACK_WEBHOOK_URL'] ? 'Hide' : 'Reveal'"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">Slack Channel (optional)</label>
+                    <input
+                        type="text"
+                        name="SLACK_CHANNEL"
+                        x-model="formData.SLACK_CHANNEL"
+                        class="form-input"
+                        placeholder="#reddit-agent"
+                    />
+                </div>
+            </div>
+        </template>
+
+        <!-- Telegram-specific fields -->
+        <template x-if="formData.NOTIFICATION_TYPE === 'telegram'">
+            <div>
+                <div class="form-field">
+                    <label class="form-label required">Telegram Bot Token</label>
+                    <div class="form-input-wrapper">
+                        <input
+                            :type="isSecret('TELEGRAM_BOT_TOKEN') && !revealed['TELEGRAM_BOT_TOKEN'] ? 'password' : 'text'"
+                            name="TELEGRAM_BOT_TOKEN"
+                            x-model="formData.TELEGRAM_BOT_TOKEN"
+                            class="form-input"
+                            placeholder="123456:ABC-DEF1234..."
+                        />
+                        <button @click="toggleReveal('TELEGRAM_BOT_TOKEN')" class="reveal-btn" type="button">
+                            <span x-text="revealed['TELEGRAM_BOT_TOKEN'] ? 'Hide' : 'Reveal'"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="form-label required">Telegram Chat ID</label>
+                    <input
+                        type="text"
+                        name="TELEGRAM_CHAT_ID"
+                        x-model="formData.TELEGRAM_CHAT_ID"
+                        class="form-input"
+                        placeholder="-1001234567890"
+                    />
+                </div>
+            </div>
+        </template>
+
+        <!-- Webhook-specific fields -->
+        <template x-if="formData.NOTIFICATION_TYPE === 'webhook'">
+            <div>
+                <div class="form-field">
+                    <label class="form-label required">Webhook URL</label>
+                    <input
+                        type="text"
+                        name="WEBHOOK_URL"
+                        x-model="formData.WEBHOOK_URL"
+                        class="form-input"
+                        placeholder="https://your-webhook-endpoint.com/notify"
+                    />
+                </div>
+                <div class="form-field">
+                    <label class="form-label">Webhook Secret (optional)</label>
+                    <div class="form-input-wrapper">
+                        <input
+                            :type="isSecret('WEBHOOK_SECRET') && !revealed['WEBHOOK_SECRET'] ? 'password' : 'text'"
+                            name="WEBHOOK_SECRET"
+                            x-model="formData.WEBHOOK_SECRET"
+                            class="form-input"
+                            placeholder="your-webhook-secret"
+                        />
+                        <button @click="toggleReveal('WEBHOOK_SECRET')" class="reveal-btn" type="button">
+                            <span x-text="revealed['WEBHOOK_SECRET'] ? 'Hide' : 'Reveal'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <div class="form-field">
+            <label class="form-label required">Public URL</label>
+            <input
+                type="text"
+                name="PUBLIC_URL"
+                x-model="formData.PUBLIC_URL"
+                class="form-input"
+                placeholder="https://your-ngrok-url.com or Railway URL"
+            />
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-xs);">
+                Required for approval callbacks
+            </p>
+        </div>
+    </div>
+
+    <!-- Safety Limits Group -->
+    <div class="field-group">
+        <h2>Safety Limits</h2>
+        <template x-for="field in ['MAX_COMMENTS_PER_DAY', 'MAX_COMMENTS_PER_RUN', 'SHADOWBAN_RISK_THRESHOLD', 'COOLDOWN_PERIOD_HOURS', 'POST_REPLY_RATIO', 'MAX_POST_REPLIES_PER_RUN', 'MAX_COMMENT_REPLIES_PER_RUN', 'MIN_JITTER_SECONDS', 'MAX_JITTER_SECONDS', 'DRY_RUN']" :key="field">
+            <div class="form-field">
+                <label class="form-label" :class="{ required: isRequired(field) }" :title="getDescription(field)">
+                    <span x-text="getLabel(field)"></span>
+                    <span x-show="getDescription(field)" style="color: var(--text-muted); font-size: 0.75rem; margin-left: 4px;">ℹ️</span>
+                </label>
+
+                <!-- Checkbox for boolean fields -->
+                <template x-if="getFieldType(field) === 'checkbox'">
+                    <input
+                        type="checkbox"
+                        :name="field"
+                        x-model="formData[field]"
+                        style="width: 24px; height: 24px; cursor: pointer;"
+                    />
+                </template>
+
+                <!-- Number input for numeric fields -->
+                <template x-if="getFieldType(field) === 'number'">
+                    <input
+                        type="number"
+                        :name="field"
+                        x-model.number="formData[field]"
+                        class="form-input"
+                        :min="getFieldMin(field)"
+                        :max="getFieldMax(field)"
+                        :step="getFieldStep(field)"
+                        :title="getDescription(field)"
+                    />
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Phase A: Inbox Priority -->
+    <div class="field-group">
+        <h2>Phase A: Inbox Priority</h2>
+        <template x-for="field in ['INBOX_PRIORITY_ENABLED', 'INBOX_COOLDOWN_HOURS', 'RISING_COOLDOWN_HOURS']" :key="field">
+            <div class="form-field">
+                <label class="form-label" :class="{ required: isRequired(field) }" :title="getDescription(field)">
+                    <span x-text="getLabel(field)"></span>
+                    <span x-show="getDescription(field)" style="color: var(--text-muted); font-size: 0.75rem; margin-left: 4px;">ℹ️</span>
+                </label>
+
+                <template x-if="getFieldType(field) === 'checkbox'">
+                    <input
+                        type="checkbox"
+                        :name="field"
+                        x-model="formData[field]"
+                        style="width: 24px; height: 24px; cursor: pointer;"
+                    />
+                </template>
+
+                <template x-if="getFieldType(field) === 'number'">
+                    <input
+                        type="number"
+                        :name="field"
+                        x-model.number="formData[field]"
+                        class="form-input"
+                        :min="getFieldMin(field)"
+                        :max="getFieldMax(field)"
+                        :title="getDescription(field)"
+                    />
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Phase B: Diversity -->
+    <div class="field-group">
+        <h2>Phase B: Diversity</h2>
+        <template x-for="field in ['DIVERSITY_ENABLED', 'MAX_PER_SUBREDDIT', 'MAX_PER_POST', 'DIVERSITY_QUALITY_BOOST_THRESHOLD']" :key="field">
+            <div class="form-field">
+                <label class="form-label" :class="{ required: isRequired(field) }" :title="getDescription(field)">
+                    <span x-text="getLabel(field)"></span>
+                    <span x-show="getDescription(field)" style="color: var(--text-muted); font-size: 0.75rem; margin-left: 4px;">ℹ️</span>
+                </label>
+
+                <template x-if="getFieldType(field) === 'checkbox'">
+                    <input
+                        type="checkbox"
+                        :name="field"
+                        x-model="formData[field]"
+                        style="width: 24px; height: 24px; cursor: pointer;"
+                    />
+                </template>
+
+                <template x-if="getFieldType(field) === 'number'">
+                    <input
+                        type="number"
+                        :name="field"
+                        x-model.number="formData[field]"
+                        class="form-input"
+                        :min="getFieldMin(field)"
+                        :max="getFieldMax(field)"
+                        :step="getFieldStep(field)"
+                        :title="getDescription(field)"
+                    />
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Quality Scoring -->
+    <div class="field-group">
+        <h2>Quality Scoring</h2>
+        <template x-for="field in ['QUALITY_SCORING_ENABLED', 'SCORE_EXPLORATION_RATE', 'SCORE_TOP_N_RANDOM']" :key="field">
+            <div class="form-field">
+                <label class="form-label" :class="{ required: isRequired(field) }" :title="getDescription(field)">
+                    <span x-text="getLabel(field)"></span>
+                    <span x-show="getDescription(field)" style="color: var(--text-muted); font-size: 0.75rem; margin-left: 4px;">ℹ️</span>
+                </label>
+
+                <template x-if="getFieldType(field) === 'checkbox'">
+                    <input
+                        type="checkbox"
+                        :name="field"
+                        x-model="formData[field]"
+                        style="width: 24px; height: 24px; cursor: pointer;"
+                    />
+                </template>
+
+                <template x-if="getFieldType(field) === 'number'">
+                    <input
+                        type="number"
+                        :name="field"
+                        x-model.number="formData[field]"
+                        class="form-input"
+                        :min="getFieldMin(field)"
+                        :max="getFieldMax(field)"
+                        :step="getFieldStep(field)"
+                        :title="getDescription(field)"
+                    />
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <button @click="previewChanges()" class="btn btn-primary" :disabled="saving">
+            Preview Changes
+        </button>
+        <button @click="resetForm()" class="btn btn-secondary" :disabled="saving">
+            Reset
+        </button>
+    </div>
+
+    <!-- Backups Section -->
+    <div class="backups-section">
+        <h2>Backups (Last 10)</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: var(--space-md);">
+            Automatic backups are created before each save
+        </p>
+        {% if backups %}
+        <div>
+            {% for backup in backups %}
+            <div class="backup-item">
+                <div class="backup-info">
+                    <div>{{ backup.timestamp_display }}</div>
+                    <div class="backup-timestamp">{{ backup.size_bytes }} bytes</div>
+                </div>
+                <button @click="restoreBackup('{{ backup.path }}')" class="btn btn-secondary btn-sm">
+                    Restore
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted);">No backups available yet</p>
+        {% endif %}
+    </div>
+
+    <!-- Preview Modal -->
+    <div x-show="showPreview"
+         x-cloak
+         class="modal-overlay"
+         @click.self="showPreview = false">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Preview Changes</h2>
+                <button class="modal-close" @click="showPreview = false">&times;</button>
+            </div>
+
+            <template x-if="previewDiff">
+                <div>
+                    <p style="margin-bottom: var(--space-md);">
+                        <strong x-text="changedCount"></strong> field(s) will be changed
+                    </p>
+
+                    <table class="diff-table">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Old Value</th>
+                                <th>New Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(diff, key) in previewDiff" :key="key">
+                                <tr :class="diff.changed ? 'diff-changed' : 'diff-unchanged'">
+                                    <td x-text="key"></td>
+                                    <td x-text="diff.old || '(empty)'"></td>
+                                    <td x-text="diff.new || '(empty)'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+
+                    <div class="action-buttons">
+                        <button @click="saveChanges()" class="btn btn-primary" :disabled="saving">
+                            <span x-show="!saving">Save Changes</span>
+                            <span x-show="saving">Saving...</span>
+                        </button>
+                        <button @click="showPreview = false" class="btn btn-secondary" :disabled="saving">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function envEditor() {
+    return {
+        // Original data from server
+        originalData: {{ env_vars|tojson }},
+
+        // Form data (editable)
+        formData: {{ env_vars|tojson }},
+
+        // Field metadata
+        metadata: {{ field_metadata|tojson }},
+
+        // Revealed fields (for password masking)
+        revealed: {},
+
+        // Field types
+        fieldTypes: {},
+
+        // Preview state
+        showPreview: false,
+        previewDiff: null,
+        changedCount: 0,
+
+        // UI state
+        saving: false,
+        successMessage: '',
+        errorMessage: '',
+        restartRequired: false,
+        hidingSuccess: false,
+        hidingError: false,
+        hidingRestart: false,
+
+        init() {
+            // Initialize field types from metadata
+            Object.keys(this.metadata).forEach(key => {
+                const meta = this.metadata[key];
+                this.fieldTypes[key] = meta.type;
+                if (meta.secret) {
+                    this.revealed[key] = false;
+                }
+
+                // Convert checkbox string values to boolean
+                if (meta.type === 'checkbox' && this.formData[key] !== undefined) {
+                    const val = this.formData[key];
+                    // Convert "True", "true", "1", "yes" to true
+                    this.formData[key] = val === true ||
+                                         val === 'True' ||
+                                         val === 'true' ||
+                                         val === '1' ||
+                                         val === 'yes';
+                }
+            });
+        },
+
+        getLabel(field) {
+            return this.metadata[field]?.label || field;
+        },
+
+        isRequired(field) {
+            return this.metadata[field]?.required || false;
+        },
+
+        isSecret(field) {
+            return this.metadata[field]?.secret || false;
+        },
+
+        getPlaceholder(field) {
+            if (this.isSecret(field) && this.originalData[field]) {
+                const val = this.originalData[field];
+                if (val.length > 6) {
+                    return `***...${val.slice(-6)}`;
+                }
+                return '***';
+            }
+            return '';
+        },
+
+        toggleReveal(field) {
+            this.revealed[field] = !this.revealed[field];
+        },
+
+        validateField(field) {
+            // Client-side validation (basic)
+            // Real validation happens server-side
+            this.errorMessage = '';
+        },
+
+        getDescription(field) {
+            return this.metadata[field]?.description || '';
+        },
+
+        getFieldType(field) {
+            return this.metadata[field]?.type || 'text';
+        },
+
+        getFieldMin(field) {
+            return this.metadata[field]?.min;
+        },
+
+        getFieldMax(field) {
+            return this.metadata[field]?.max;
+        },
+
+        getFieldStep(field) {
+            return this.metadata[field]?.step || (this.getFieldType(field) === 'number' ? 1 : undefined);
+        },
+
+        showSuccessToast(message, duration = 5000) {
+            this.successMessage = message;
+            this.hidingSuccess = false;
+            setTimeout(() => {
+                this.hidingSuccess = true;
+                setTimeout(() => {
+                    this.successMessage = '';
+                    this.hidingSuccess = false;
+                }, 300); // Wait for animation
+            }, duration);
+        },
+
+        showErrorToast(message, duration = 8000) {
+            this.errorMessage = message;
+            this.hidingError = false;
+            setTimeout(() => {
+                this.hidingError = true;
+                setTimeout(() => {
+                    this.errorMessage = '';
+                    this.hidingError = false;
+                }, 300);
+            }, duration);
+        },
+
+        showRestartToast(duration = 15000) {
+            this.restartRequired = true;
+            this.hidingRestart = false;
+            setTimeout(() => {
+                this.hidingRestart = true;
+                setTimeout(() => {
+                    this.restartRequired = false;
+                    this.hidingRestart = false;
+                }, 300);
+            }, duration);
+        },
+
+        resetForm() {
+            this.formData = JSON.parse(JSON.stringify(this.originalData));
+            this.successMessage = '';
+            this.errorMessage = '';
+        },
+
+        async previewChanges() {
+            this.errorMessage = '';
+
+            try {
+                // Convert to strings and skip empty values
+                const stringifiedData = {};
+                for (const [key, value] of Object.entries(this.formData)) {
+                    // Skip empty/null/undefined values - don't send them
+                    // BUT don't skip boolean false (checkboxes can be unchecked)
+                    if ((value === null || value === undefined || value === '') && value !== false) {
+                        continue;
+                    }
+
+                    // Convert booleans to Python-style strings
+                    if (typeof value === 'boolean') {
+                        stringifiedData[key] = value ? 'True' : 'False';
+                    } else {
+                        // Convert to string (since .env is text-based)
+                        stringifiedData[key] = String(value);
+                    }
+                }
+
+                const response = await fetch('/admin/api/env/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        env_vars: stringifiedData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.previewDiff = data.diff;
+                    this.changedCount = Object.values(data.diff).filter(d => d.changed).length;
+                    this.showPreview = true;
+                } else {
+                    this.showErrorToast('Validation failed: ' + (data.errors || []).map(e => e.msg).join(', '));
+                }
+            } catch (error) {
+                this.showErrorToast('Failed to preview changes: ' + error.message);
+            }
+        },
+
+        async saveChanges() {
+            this.saving = true;
+            this.errorMessage = '';
+            this.successMessage = '';
+
+            try {
+                // Convert to strings and skip empty values
+                const stringifiedData = {};
+                for (const [key, value] of Object.entries(this.formData)) {
+                    // Skip empty/null/undefined values - don't send them
+                    // BUT don't skip boolean false (checkboxes can be unchecked)
+                    if ((value === null || value === undefined || value === '') && value !== false) {
+                        continue;
+                    }
+
+                    // Convert booleans to Python-style strings
+                    if (typeof value === 'boolean') {
+                        stringifiedData[key] = value ? 'True' : 'False';
+                    } else {
+                        // Convert to string (since .env is text-based)
+                        stringifiedData[key] = String(value);
+                    }
+                }
+
+                const response = await fetch('/admin/api/env/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        env_vars: stringifiedData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.showSuccessToast(data.message);
+                    this.showPreview = false;
+                    this.showRestartToast();
+                    this.originalData = JSON.parse(JSON.stringify(this.formData));
+                } else {
+                    this.showErrorToast('Save failed: ' + data.error);
+                }
+            } catch (error) {
+                this.showErrorToast('Failed to save changes: ' + error.message);
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async restoreBackup(backupPath) {
+            if (!confirm('Restore from this backup? Current .env will be backed up first.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/env/restore', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        backup_path: backupPath
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.showSuccessToast(data.message + ' - Reloading page...');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    this.showErrorToast('Restore failed: ' + data.error);
+                }
+            } catch (error) {
+                this.showErrorToast('Failed to restore backup: ' + error.message);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}
