@@ -19,6 +19,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
+import { TableOfContents } from "./table-of-contents";
 
 const navItems = [
   { name: "Getting Started", link: "/getting-started" },
@@ -62,6 +63,9 @@ export function SiteNavbar() {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Table of Contents dropdown - shows on doc pages */}
+        {pathname !== "/" && <TableOfContents />}
 
         {/* Mobile Navigation */}
         <Sheet>

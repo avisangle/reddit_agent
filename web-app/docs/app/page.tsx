@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CodeBlock } from "@/components/docs";
+
 import { CheckCircle, Shield, BarChart3, Database, Info } from "lucide-react";
 
 export default function Home() {
@@ -118,28 +118,27 @@ export default function Home() {
           <CardDescription>Get up and running in minutes</CardDescription>
         </CardHeader>
         <CardContent>
-          <CodeBlock language="bash">{`# Clone and setup
-git clone https://github.com/avisangle/reddit_agent.git
-cd reddit_agent
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure .env file
-cp .env.example .env
-# Edit .env with your credentials
-
-# Run migrations
-alembic upgrade head
-
-# Start callback server (for approvals)
-python main.py server
-
-# In another terminal: Run agent
-python main.py run --once`}</CodeBlock>
+          <ul className="space-y-2 mb-4">
+            <li className="flex items-start gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+              <span>Clone the repository</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+              <span>Configure <code className="text-sm bg-muted px-1 rounded">.env</code> with your Reddit & LLM credentials</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+              <span>Start the callback server for approvals</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+              <span>Run the agent</span>
+            </li>
+          </ul>
+          <Button asChild>
+            <Link href="/getting-started">View full setup guide →</Link>
+          </Button>
         </CardContent>
       </Card>
 
@@ -150,21 +149,14 @@ python main.py run --once`}</CodeBlock>
           <CardDescription>13-node LangGraph workflow</CardDescription>
         </CardHeader>
         <CardContent>
-          <ol className="list-decimal list-inside space-y-1 text-sm">
-            <li>Fetch candidates (inbox replies + rising content)</li>
-            <li>Apply post/comment ratio distribution (30/70)</li>
-            <li>Score with 7-factor AI quality system</li>
-            <li>Filter cooldowns and duplicates</li>
-            <li>Verify subreddit compliance</li>
-            <li>Sort by (priority, quality_score) with 25% exploration</li>
-            <li>Apply diversity limits (max 2/subreddit, 1/post)</li>
-            <li>Check daily limits (≤8/day)</li>
-            <li>Build vertical context chain</li>
-            <li>Generate draft with Gemini 2.5 Flash</li>
-            <li>Send for human approval</li>
-            <li>Auto-publish approved drafts</li>
-            <li>Track 24h engagement metrics</li>
-          </ol>
+          <p className="mb-4">
+            The agent uses a sophisticated pipeline with key phases: <strong>candidate fetching</strong> (inbox + rising),
+            <strong> quality scoring</strong> (7-factor AI system), <strong>diversity selection</strong> (subreddit limits),
+            <strong> draft generation</strong> (Gemini 2.5 Flash), and <strong>human approval</strong> with auto-publishing.
+          </p>
+          <Button asChild variant="outline">
+            <Link href="/architecture">View full architecture →</Link>
+          </Button>
         </CardContent>
       </Card>
 

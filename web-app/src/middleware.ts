@@ -7,6 +7,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // Redirect root to admin dashboard
+    if (pathname === '/') {
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
+
     // Check if path is protected
     if (PROTECTED_PATHS.some(path => pathname.startsWith(path))) {
         // Get session cookie
@@ -46,5 +51,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*', '/workflow/:path*']
+    matcher: ['/', '/admin/:path*', '/workflow/:path*']
 };

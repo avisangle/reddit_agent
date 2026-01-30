@@ -14,6 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Terminal, Server, Play, TestTube, Settings, Wrench } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 export default function GettingStartedPage() {
   return (
@@ -97,7 +103,7 @@ export default function GettingStartedPage() {
 
         <SubSection>
           <SubSectionHeader>1. Clone the Repository</SubSectionHeader>
-          <CodeBlock language="bash">{`git clone https://github.com/yourusername/reddit_agent.git
+          <CodeBlock language="bash">{`git clone https://github.com/avisangle/reddit_agent.git
 cd reddit_agent`}</CodeBlock>
         </SubSection>
 
@@ -154,7 +160,10 @@ venv\\Scripts\\activate`}</CodeBlock>
 REDDIT_CLIENT_SECRET=your_client_secret_here
 REDDIT_USERNAME=your_reddit_username
 REDDIT_PASSWORD=your_reddit_password
-REDDIT_USER_AGENT=android:com.yourname.app:v2.1 (by /u/YourUsername)`}</CodeBlock>
+REDDIT_USER_AGENT=android:com.yourapp.agent:v2.5 (by /u/YourUsername)`}</CodeBlock>
+              <p className="text-sm text-muted-foreground mt-2">
+                See <Link href="/configuration" className="text-primary hover:underline">Configuration Reference</Link> for all options.
+              </p>
             </TabsContent>
 
             <TabsContent value="subreddits" className="mt-4">
@@ -165,31 +174,20 @@ REDDIT_USER_AGENT=android:com.yourname.app:v2.1 (by /u/YourUsername)`}</CodeBloc
             </TabsContent>
 
             <TabsContent value="llm" className="mt-4">
-              <CodeBlock language="bash">{`# Recommended: Gemini 2.5 Flash (fastest, cheapest)
-GEMINI_API_KEY=your_gemini_api_key
-
-# Alternatives
-# OPENAI_API_KEY=your_openai_key
-# ANTHROPIC_API_KEY=your_anthropic_key`}</CodeBlock>
+              <CodeBlock language="bash">{`# Recommended: Gemini 2.5 Flash
+GEMINI_API_KEY=your_gemini_api_key`}</CodeBlock>
+              <p className="text-sm text-muted-foreground mt-2">
+                See <Link href="/configuration" className="text-primary hover:underline">Configuration Reference</Link> for alternative LLM providers.
+              </p>
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-4 space-y-4">
-              <div>
-                <p className="font-medium mb-2">Option A: Slack</p>
-                <CodeBlock language="bash">{`NOTIFICATION_TYPE=slack
+              <CodeBlock language="bash">{`# Example: Slack
+NOTIFICATION_TYPE=slack
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL`}</CodeBlock>
-              </div>
-              <div>
-                <p className="font-medium mb-2">Option B: Telegram</p>
-                <CodeBlock language="bash">{`NOTIFICATION_TYPE=telegram
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id`}</CodeBlock>
-              </div>
-              <div>
-                <p className="font-medium mb-2">Option C: Custom Webhook</p>
-                <CodeBlock language="bash">{`NOTIFICATION_TYPE=webhook
-WEBHOOK_URL=https://your-webhook-url.com/endpoint`}</CodeBlock>
-              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                See <Link href="/configuration" className="text-primary hover:underline">Configuration Reference</Link> for Telegram and webhook options.
+              </p>
             </TabsContent>
 
             <TabsContent value="url" className="mt-4 space-y-4">
@@ -378,70 +376,74 @@ python main.py run --once`}</CodeBlock>
         </Callout>
       </Section>
 
-      <Section>
+      <Section id="troubleshooting">
         <SectionHeader>Troubleshooting</SectionHeader>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">&quot;No candidates found&quot;</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-muted-foreground"><strong className="text-foreground">Cause</strong>: No new content in allowed subreddits, or all candidates in cooldown.</p>
-              <p className="text-muted-foreground"><strong className="text-foreground">Solution</strong>:</p>
+        <Accordion type="single" collapsible className="w-full space-y-3">
+          <AccordionItem value="no-candidates" className="bg-card rounded-lg border shadow-sm">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="font-medium">&quot;No candidates found&quot;</span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-muted-foreground mb-2"><strong className="text-foreground">Cause</strong>: No new content in allowed subreddits, or all candidates in cooldown.</p>
+              <p className="text-muted-foreground mb-1"><strong className="text-foreground">Solution</strong>:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>Check <InlineCode>ALLOWED_SUBREDDITS</InlineCode> is configured</li>
                 <li>Wait for cooldown periods (6h inbox, 24h rising)</li>
                 <li>Check <InlineCode>replied_items</InlineCode> table for cooldown status</li>
               </ul>
-            </CardContent>
-          </Card>
+            </AccordionContent>
+          </AccordionItem>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">&quot;Shadowban risk detected&quot;</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-muted-foreground"><strong className="text-foreground">Cause</strong>: Agent detected unusual downvote patterns.</p>
-              <p className="text-muted-foreground"><strong className="text-foreground">Solution</strong>:</p>
+          <AccordionItem value="shadowban" className="bg-card rounded-lg border shadow-sm">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="font-medium">&quot;Shadowban risk detected&quot;</span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-muted-foreground mb-2"><strong className="text-foreground">Cause</strong>: Agent detected unusual downvote patterns.</p>
+              <p className="text-muted-foreground mb-1"><strong className="text-foreground">Solution</strong>:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>Review recent comments for quality</li>
                 <li>Check subreddit rules compliance</li>
                 <li>Wait 24-48 hours before resuming</li>
               </ul>
-            </CardContent>
-          </Card>
+            </AccordionContent>
+          </AccordionItem>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">&quot;LLM API error&quot;</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-muted-foreground"><strong className="text-foreground">Cause</strong>: Invalid API key or rate limit hit.</p>
-              <p className="text-muted-foreground"><strong className="text-foreground">Solution</strong>:</p>
+          <AccordionItem value="llm-error" className="bg-card rounded-lg border shadow-sm">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="font-medium">&quot;LLM API error&quot;</span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-muted-foreground mb-2"><strong className="text-foreground">Cause</strong>: Invalid API key or rate limit hit.</p>
+              <p className="text-muted-foreground mb-1"><strong className="text-foreground">Solution</strong>:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>Verify API key in <InlineCode>.env</InlineCode></li>
                 <li>Check API quota/billing</li>
                 <li>Try alternative LLM provider</li>
               </ul>
-            </CardContent>
-          </Card>
+            </AccordionContent>
+          </AccordionItem>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">&quot;Approval link not working&quot;</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-muted-foreground"><strong className="text-foreground">Cause</strong>: <InlineCode>PUBLIC_URL</InlineCode> not accessible or incorrect.</p>
-              <p className="text-muted-foreground"><strong className="text-foreground">Solution</strong>:</p>
+          <AccordionItem value="approval-link" className="bg-card rounded-lg border shadow-sm">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="font-medium">&quot;Approval link not working&quot;</span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-muted-foreground mb-2"><strong className="text-foreground">Cause</strong>: <InlineCode>PUBLIC_URL</InlineCode> not accessible or incorrect.</p>
+              <p className="text-muted-foreground mb-1"><strong className="text-foreground">Solution</strong>:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>Verify callback server is running</li>
                 <li>Check ngrok tunnel is active</li>
                 <li>Test <InlineCode>PUBLIC_URL/health</InlineCode> in browser</li>
               </ul>
-            </CardContent>
-          </Card>
-        </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
+        <p className="text-sm text-muted-foreground mt-4">
+          For more troubleshooting help, see the <Link href="/faq#troubleshooting" className="text-primary hover:underline">FAQ</Link>.
+        </p>
       </Section>
 
       <Section id="best-practices">

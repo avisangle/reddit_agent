@@ -17,14 +17,29 @@ export function Section({ children, className, id }: SectionProps) {
 interface SectionHeaderProps {
     children: React.ReactNode
     className?: string
+    id?: string
 }
 
-export function SectionHeader({ children, className }: SectionHeaderProps) {
+function generateId(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim()
+}
+
+export function SectionHeader({ children, className, id }: SectionHeaderProps) {
+    const headingId = id || (typeof children === 'string' ? generateId(children) : undefined)
+    
     return (
-        <h2 className={cn(
-            "text-2xl font-semibold tracking-tight border-b border-border pb-3 mb-6",
-            className
-        )}>
+        <h2 
+            id={headingId}
+            className={cn(
+                "text-2xl font-semibold tracking-tight border-b border-border pb-3 mb-6 scroll-mt-20",
+                className
+            )}
+        >
             {children}
         </h2>
     )
@@ -46,14 +61,20 @@ export function SubSection({ children, className }: SubSectionProps) {
 interface SubSectionHeaderProps {
     children: React.ReactNode
     className?: string
+    id?: string
 }
 
-export function SubSectionHeader({ children, className }: SubSectionHeaderProps) {
+export function SubSectionHeader({ children, className, id }: SubSectionHeaderProps) {
+    const headingId = id || (typeof children === 'string' ? generateId(children) : undefined)
+    
     return (
-        <h3 className={cn(
-            "text-xl font-medium tracking-tight",
-            className
-        )}>
+        <h3 
+            id={headingId}
+            className={cn(
+                "text-xl font-medium tracking-tight scroll-mt-20",
+                className
+            )}
+        >
             {children}
         </h3>
     )

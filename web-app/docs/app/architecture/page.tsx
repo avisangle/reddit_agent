@@ -134,27 +134,10 @@ User Clicks Approve → Auto-Publish to Reddit`}</CodeBlock>
 
         <SubSection>
           <SubSectionHeader>3. Quality-Driven Selection</SubSectionHeader>
-          <p className="text-muted-foreground mb-4">7-factor AI scoring system with historical learning:</p>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Factor</TableHead>
-                  <TableHead>Weight</TableHead>
-                  <TableHead>Description</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow><TableCell>Upvote Ratio</TableCell><TableCell>0.25</TableCell><TableCell>Post/comment engagement quality</TableCell></TableRow>
-                <TableRow><TableCell>Author Karma</TableCell><TableCell>0.15</TableCell><TableCell>Credibility of author</TableCell></TableRow>
-                <TableRow><TableCell>Freshness</TableCell><TableCell>0.20</TableCell><TableCell>How recent the content is</TableCell></TableRow>
-                <TableRow><TableCell>Velocity</TableCell><TableCell>0.10</TableCell><TableCell>Comment growth rate</TableCell></TableRow>
-                <TableRow><TableCell>Question Signal</TableCell><TableCell>0.10</TableCell><TableCell>Presence of questions</TableCell></TableRow>
-                <TableRow><TableCell>Thread Depth</TableCell><TableCell>0.05</TableCell><TableCell>Position in comment tree</TableCell></TableRow>
-                <TableRow><TableCell>Historical</TableCell><TableCell>0.15</TableCell><TableCell>Past performance in subreddit</TableCell></TableRow>
-              </TableBody>
-            </Table>
-          </div>
+          <p className="text-muted-foreground">
+            The scoring system uses 7 weighted factors including upvote ratio, author karma, freshness, velocity, question signals, thread depth, and historical performance. 
+            See <Link href="/features#quality-scoring-system" className="text-primary hover:underline">Features - Quality Scoring</Link> for the complete breakdown and weights.
+          </p>
         </SubSection>
       </Section>
 
@@ -191,16 +174,10 @@ comment_count = total_count - post_count  # 2`}</CodeBlock>
           <p className="text-muted-foreground"><strong className="text-foreground">Purpose</strong>: AI-powered 7-factor quality scoring.</p>
           <p className="text-muted-foreground"><strong className="text-foreground">Inputs</strong>: Candidates from ratio selection</p>
           <p className="text-muted-foreground"><strong className="text-foreground">Outputs</strong>: Candidates with <InlineCode>quality_score</InlineCode> (0.0-1.0)</p>
-          <p className="text-muted-foreground mt-2"><strong className="text-foreground">Factors</strong>:</p>
-          <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-            <li><strong className="text-foreground">Upvote ratio</strong> (25%): <InlineCode>upvotes / (upvotes + downvotes)</InlineCode></li>
-            <li><strong className="text-foreground">Author karma</strong> (15%): <InlineCode>log(karma) / 15</InlineCode> capped at 1.0</li>
-            <li><strong className="text-foreground">Freshness</strong> (20%): Exponential decay based on age</li>
-            <li><strong className="text-foreground">Velocity</strong> (10%): <InlineCode>num_comments / hours_since_creation</InlineCode></li>
-            <li><strong className="text-foreground">Question signal</strong> (10%): Presence of <InlineCode>?</InlineCode> in title/body</li>
-            <li><strong className="text-foreground">Thread depth</strong> (5%): Shallow threads score higher</li>
-            <li><strong className="text-foreground">Historical</strong> (15%): Past performance in this subreddit</li>
-          </ol>
+          <p className="text-muted-foreground mt-2">
+            Scoring factors: upvote ratio, author karma, freshness, velocity, question signal, thread depth, and historical performance. 
+            See <Link href="/features#quality-scoring-system" className="text-primary hover:underline">Quality Scoring</Link> for weights and calculation details.
+          </p>
         </SubSection>
 
         <SubSection>

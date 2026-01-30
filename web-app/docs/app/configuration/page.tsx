@@ -66,7 +66,7 @@ REDDIT_USERNAME=your_reddit_username
 REDDIT_PASSWORD=your_reddit_password
 
 # User Agent Format
-REDDIT_USER_AGENT=android:com.yourname.app:v2.1 (by /u/YourUsername)`}</CodeBlock>
+REDDIT_USER_AGENT=android:com.yourapp.agent:v2.5 (by /u/YourUsername)`}</CodeBlock>
                 <Callout variant="info">
                   <strong>Creating Reddit App</strong>: Visit{" "}
                   <a href="https://www.reddit.com/prefs/apps" className="text-primary hover:underline">reddit.com/prefs/apps</a> → &quot;Create App&quot; → Select &quot;script&quot; → Copy client ID and secret.
@@ -80,7 +80,7 @@ REDDIT_USER_AGENT=android:com.yourname.app:v2.1 (by /u/YourUsername)`}</CodeBloc
                   Subreddit Configuration
                   <Badge variant="destructive">Required</Badge>
                 </CardTitle>
-                <CardDescription>Allowlist of subreddits the agent can operate in</CardDescription>
+                <CardDescription>Allow-list of subreddits the agent can operate in</CardDescription>
               </CardHeader>
               <CardContent>
                 <CodeBlock language="bash">{`# Comma-separated list (no spaces)
@@ -463,7 +463,7 @@ REDDIT_CLIENT_ID=abc123xyz
 REDDIT_CLIENT_SECRET=xyz789abc
 REDDIT_USERNAME=YourUsername
 REDDIT_PASSWORD=YourPassword
-REDDIT_USER_AGENT=android:com.yourname.app:v2.1 (by /u/YourUsername)
+REDDIT_USER_AGENT=android:com.yourapp.agent:v2.5 (by /u/YourUsername)
 
 # Subreddits
 ALLOWED_SUBREDDITS=sysadmin,learnpython,startups

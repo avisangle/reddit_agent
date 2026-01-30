@@ -395,24 +395,17 @@ else:
 
       <Section>
         <SectionHeader>Feature Configuration</SectionHeader>
-        <CodeBlock language="bash">{`# .env configuration
-INBOX_PRIORITY_ENABLED=True
-DIVERSITY_ENABLED=True
-QUALITY_SCORING_ENABLED=True
-AUTO_PUBLISH_ENABLED=True
-
-# Cooldown periods
-INBOX_COOLDOWN_HOURS=6
-RISING_COOLDOWN_HOURS=24
-
-# Diversity limits
-MAX_PER_SUBREDDIT=2
-MAX_PER_POST=1
-DIVERSITY_QUALITY_BOOST_THRESHOLD=0.75
-
-# Exploration
-SCORE_EXPLORATION_RATE=0.25
-SCORE_TOP_N_RANDOM=5`}</CodeBlock>
+        <p className="text-muted-foreground mb-4">
+          All features can be configured via environment variables. Key toggles include:
+        </p>
+        <ul className="list-disc list-inside space-y-1 text-muted-foreground mb-4">
+          <li><InlineCode>INBOX_PRIORITY_ENABLED</InlineCode> - Enable inbox priority system</li>
+          <li><InlineCode>DIVERSITY_ENABLED</InlineCode> - Enable subreddit diversity limits</li>
+          <li><InlineCode>AUTO_PUBLISH_ENABLED</InlineCode> - Auto-publish approved drafts</li>
+        </ul>
+        <p className="text-muted-foreground">
+          See <Link href="/configuration#feature-toggles" className="text-primary hover:underline">Configuration Reference</Link> for all options and defaults.
+        </p>
       </Section>
 
       <Section>

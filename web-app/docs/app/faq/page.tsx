@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Callout, CodeBlock } from "@/components/docs"
+import { Callout, CodeBlock, InlineCode, PageWrapper, PageHeader, SectionHeader } from "@/components/docs"
 import {
   Accordion,
   AccordionContent,
@@ -17,13 +17,15 @@ import {
 
 export default function FAQPage() {
   return (
-    <article className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-4xl font-bold mb-4">Frequently Asked Questions</h1>
-      <p className="text-muted-foreground mb-8">Common questions and troubleshooting for the Reddit Agent.</p>
+    <PageWrapper className="py-8 px-4">
+      <PageHeader
+        title="Frequently Asked Questions"
+        description="Common questions and troubleshooting for the Reddit Agent."
+      />
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">General Questions</h2>
+      <SectionHeader>General Questions</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="tos" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">Is this bot against Reddit&apos;s Terms of Service?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
@@ -83,25 +85,25 @@ export default function FAQPage() {
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Setup Questions</h2>
+      <SectionHeader>Setup Questions</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="no-candidates" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">&quot;No candidates found&quot; - What&apos;s wrong?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
             <p><strong>Common causes:</strong></p>
             <ol>
               <li><strong>No new content</strong>: Allowed subreddits have no rising posts/comments
-                <ul><li>Solution: Wait or add more subreddits to <code>ALLOWED_SUBREDDITS</code></li></ul>
+                <ul><li>Solution: Wait or add more subreddits to <InlineCode>ALLOWED_SUBREDDITS</InlineCode></li></ul>
               </li>
               <li><strong>All in cooldown</strong>: Previously replied items still in cooldown period
                 <ul>
                   <li>Solution: Wait for cooldown to expire (6h inbox, 24h rising)</li>
-                  <li>Check: <code>SELECT * FROM replied_items WHERE cooldown_until &gt; datetime(&apos;now&apos;)</code></li>
+                  <li>Check: <InlineCode>SELECT * FROM replied_items WHERE cooldown_until &gt; datetime(&apos;now&apos;)</InlineCode></li>
                 </ul>
               </li>
               <li><strong>Quality threshold</strong>: No candidates meet minimum quality score
-                <ul><li>Solution: Lower <code>DIVERSITY_QUALITY_BOOST_THRESHOLD</code> (default: 0.75)</li></ul>
+                <ul><li>Solution: Lower <InlineCode>DIVERSITY_QUALITY_BOOST_THRESHOLD</InlineCode> (default: 0.75)</li></ul>
               </li>
               <li><strong>Bot filtering</strong>: All candidates are bot accounts
                 <ul><li>Solution: Normal behavior, wait for human-authored content</li></ul>
@@ -133,7 +135,7 @@ ngrok http 8000
             <ol start={4}>
               <li><strong>Token expired?</strong> (48h TTL)
                 <ul>
-                  <li>Check <code>draft_queue.token_expires_at</code></li>
+                  <li>Check <InlineCode>draft_queue.token_expires_at</InlineCode></li>
                   <li>Request new draft if expired</li>
                 </ul>
               </li>
@@ -155,16 +157,16 @@ ADMIN_PASSWORD_HASH=$2b$12$<your_new_hash>`}</CodeBlock>
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Workflow Questions</h2>
+      <SectionHeader>Workflow Questions</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="no-approve" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">What happens if I don&apos;t approve a draft?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
             <p><strong>After 48 hours:</strong></p>
             <ul>
               <li>Token expires</li>
-              <li>Draft remains as <code>PENDING</code> in database</li>
+              <li>Draft remains as <InlineCode>PENDING</InlineCode> in database</li>
               <li>No action taken</li>
               <li>Candidate moves to cooldown (6h or 24h)</li>
             </ul>
@@ -195,7 +197,7 @@ UPDATE draft_queue SET status = 'REJECTED' WHERE token_expires_at < datetime('no
         <AccordionItem value="manual-publish" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">How do I manually publish approved drafts?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
-            <p>If <code>AUTO_PUBLISH_ENABLED=False</code>:</p>
+            <p>If <InlineCode>AUTO_PUBLISH_ENABLED=False</InlineCode>:</p>
             <CodeBlock>{`# Publish up to 3 approved drafts
 python main.py publish --limit 3
 
@@ -220,20 +222,19 @@ VALUES ('t1_abc123', 'sysadmin', 'MANUAL', datetime('now'));`}</CodeBlock>
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Feature Questions</h2>
+      <SectionHeader>Feature Questions</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="quality-scoring" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">How does quality scoring work?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
-            <p>See <Link href="/features#quality-scoring-system">Features - Quality Scoring</Link> for detailed explanation.</p>
-            <p><strong>Quick summary:</strong></p>
-            <ul>
-              <li>7 weighted factors (upvote ratio, karma, freshness, etc.)</li>
-              <li>Historical learning from past performance</li>
-              <li>Score range: 0.0 (low quality) to 1.0 (high quality)</li>
-              <li>Exploration: 25% randomization to avoid patterns</li>
-            </ul>
+            <p className="text-muted-foreground">
+              The agent uses a 7-factor AI scoring system. See{" "}
+              <Link href="/features#quality-scoring-system" className="text-primary hover:underline">
+                Features - Quality Scoring
+              </Link>{" "}
+              for the complete breakdown including weights, calculation examples, and historical learning.
+            </p>
           </AccordionContent>
         </AccordionItem>
 
@@ -255,12 +256,15 @@ VALUES ('t1_abc123', 'sysadmin', 'MANUAL', datetime('now'));`}</CodeBlock>
                 <TableRow><TableCell><strong>Risk</strong></TableCell><TableCell>Lower (natural to respond)</TableCell><TableCell>Higher (proactive commenting)</TableCell></TableRow>
               </TableBody>
             </Table>
+            <p className="text-muted-foreground mt-4">
+              See <Link href="/features#inbox-priority-system" className="text-primary hover:underline">Features - Inbox Priority</Link> for more details.
+            </p>
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="disable-diversity">
-          <AccordionTrigger>Can I disable diversity limits?</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem value="disable-diversity" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
+          <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">Can I disable diversity limits?</AccordionTrigger>
+          <AccordionContent className="text-muted-foreground px-5">
             <CodeBlock>{`# .env
 DIVERSITY_ENABLED=False`}</CodeBlock>
             <p><strong>Not recommended</strong>: Diversity prevents spam patterns. Disabling increases shadowban risk.</p>
@@ -291,9 +295,9 @@ ORDER BY date DESC;`}</CodeBlock>
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Troubleshooting</h2>
+      <SectionHeader>Troubleshooting</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="rate-limit-llm" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">&quot;LLM API error: Rate limit exceeded&quot;</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
@@ -317,7 +321,7 @@ ORDER BY date DESC;`}</CodeBlock>
             <p><strong>Solution:</strong></p>
             <ul>
               <li>Agent respects rate limits automatically</li>
-              <li>If still occurring, add delay: <code>REDDIT_API_DELAY=2</code> (2 seconds)</li>
+              <li>If still occurring, add delay: <InlineCode>REDDIT_API_DELAY=2</InlineCode> (2 seconds)</li>
             </ul>
           </AccordionContent>
         </AccordionItem>
@@ -375,15 +379,15 @@ python main.py run --once`}</CodeBlock>
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Advanced Questions</h2>
+      <SectionHeader>Advanced Questions</SectionHeader>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full space-y-3 mb-8">
         <AccordionItem value="multiple-accounts" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">Can I run multiple accounts?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
             <p><strong>Technically possible</strong> but <strong>not recommended</strong>:</p>
             <ul>
-              <li>Each account needs separate <code>.env</code> and database</li>
+              <li>Each account needs separate <InlineCode>.env</InlineCode> and database</li>
               <li>Increases complexity and risk</li>
               <li>Reddit frowns upon multiple accounts</li>
             </ul>
@@ -416,7 +420,7 @@ psql reddit_agent < dump.sql`}</CodeBlock>
         <AccordionItem value="customize-prompts" className="bg-card rounded-md border-b-0 shadow-md data-[state=open]:shadow-lg">
           <AccordionTrigger className="px-5 [&>svg]:rotate-90 [&[data-state=open]>svg]:rotate-0">Can I customize LLM prompts?</AccordionTrigger>
           <AccordionContent className="text-muted-foreground px-5">
-            <p><strong>Yes</strong>, edit <code>prompts/templates.yaml</code>:</p>
+            <p><strong>Yes</strong>, edit <InlineCode>prompts/templates.yaml</InlineCode>:</p>
             <CodeBlock>{`personas:
   helpful:
     system_prompt: "You are a helpful Reddit user..."
@@ -431,19 +435,19 @@ python main.py server`}</CodeBlock>
         </AccordionItem>
       </Accordion>
 
-      <h2 className="text-2xl font-semibold mt-12 mb-4">Need More Help?</h2>
-      <ul>
-        <li><strong>GitHub Issues</strong>: <a href="https://github.com/avisangle/reddit_agent/issues">github.com/avisangle/reddit_agent/issues</a></li>
-        <li><strong>Documentation</strong>: <Link href="/getting-started">Getting Started</Link>, <Link href="/architecture">Architecture</Link>, <Link href="/features">Features</Link></li>
-        <li><strong>Best Practices</strong>: <Link href="/getting-started#best-practices">Tips for optimal usage</Link></li>
-        <li><strong>Logs</strong>: Check <code>reddit_agent.log</code> for detailed error messages</li>
+      <SectionHeader>Need More Help?</SectionHeader>
+      <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+        <li><strong>GitHub Issues</strong>: <a href="https://github.com/avisangle/reddit_agent/issues" className="text-primary hover:underline">github.com/avisangle/reddit_agent/issues</a></li>
+        <li><strong>Documentation</strong>: <Link href="/getting-started" className="text-primary hover:underline">Getting Started</Link>, <Link href="/architecture" className="text-primary hover:underline">Architecture</Link>, <Link href="/features" className="text-primary hover:underline">Features</Link></li>
+        <li><strong>Best Practices</strong>: <Link href="/getting-started#best-practices" className="text-primary hover:underline">Tips for optimal usage</Link></li>
+        <li><strong>Logs</strong>: Check <InlineCode>reddit_agent.log</InlineCode> for detailed error messages</li>
       </ul>
 
       <hr className="my-8" />
 
       <Callout variant="success">
-        <p><strong>Still stuck?</strong> Review the troubleshooting section above or check your logs at <code>reddit_agent.log</code> for detailed error messages.</p>
+        <p><strong>Still stuck?</strong> Review the troubleshooting section above or check your logs at <InlineCode>reddit_agent.log</InlineCode> for detailed error messages.</p>
       </Callout>
-    </article>
+    </PageWrapper>
   )
 }
