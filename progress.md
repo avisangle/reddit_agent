@@ -1,5 +1,118 @@
 # Progress Log
 
+## 2026-01-30: Bio Site Integration Complete
+
+### Task
+Integrate Reddit Agent documentation with personal bio site at avinashsangle.com.
+
+### Implementation Summary
+
+**Hybrid Documentation Strategy**:
+- Public comprehensive guide on bio site at `/projects/reddit-agent`
+- Local documentation remains in `web-app/docs/` for developers
+- Cross-linking between both sources
+
+### Files Modified/Created (7 files)
+
+**Bio Site** (3 files):
+1. **`github_bio/src/data/projects.ts`** (+18 lines)
+   - Added reddit-agent project entry with order: 0 (top position)
+   - All metadata: title, description, technologies, tags, route, status
+
+2. **`github_bio/src/app/projects/reddit-agent/page.tsx`** (NEW, 1,150 lines)
+   - Comprehensive project page with 20+ sections
+   - 3 JSON-LD schemas (SoftwareApplication, BreadcrumbList, FAQPage)
+   - SEO metadata with OpenGraph and Twitter cards
+   - Sections: Overview, Features, Architecture, Getting Started, Configuration, FAQ, etc.
+
+3. **`github_bio/public/sitemap.xml`** (+6 lines)
+   - Added reddit-agent entry (lastmod: 2026-01-30, priority: 0.8)
+
+**Reddit Agent** (4 files):
+4. **`README.md`** (+2 lines)
+   - Added documentation badge linking to bio site
+
+5. **`CLAUDE.md`** (+35 lines)
+   - Added "Documentation" section explaining dual approach
+   - Updated Last Updated date to 2026-01-30
+
+6. **`.env`** (verified)
+   - Admin password hash already correct for bio site integration testing
+
+7. **`progress.md`** (THIS FILE, +40 lines)
+   - Documented bio site integration completion
+
+### SEO/AEO Optimization
+
+**Metadata**:
+- Title: "Reddit Comment Engagement Agent - AI-Powered Engagement with HITL Approval"
+- Description: 160-char optimized for search
+- Keywords: reddit automation, ai agent, langgraph, hitl approval, etc.
+
+**Schemas**:
+- SoftwareApplication schema with app details
+- BreadcrumbList schema for navigation
+- FAQPage schema with 8 questions
+
+**Social Media**:
+- OpenGraph tags for Facebook/LinkedIn
+- Twitter Card tags for Twitter
+
+### Build Status
+
+**Bio Site Build**:
+- ✅ Compiled successfully (4.1s)
+- ✅ TypeScript check passed
+- ✅ All 18 routes generated (including `/projects/reddit-agent`)
+- ✅ Static export successful
+
+### Documentation URLs
+
+**Public**:
+- Live site: https://avinashsangle.com/projects/reddit-agent (after deployment)
+- GitHub repo: Badge in README.md
+
+**Local**:
+- Location: `web-app/docs/`
+- Run: `cd web-app/docs && npm run dev`
+- Port: localhost:3001
+
+### Cross-Linking
+
+**Bio Site → Reddit Agent**:
+- Homepage projects grid auto-generates card
+- Projects page filterable by "AI Automation" category
+- Featured project (featured: true)
+
+**Reddit Agent → Bio Site**:
+- README badge with blue shield icon
+- CLAUDE.md Documentation section
+- Bio site URL in GitHub repo About section (to be added)
+
+### Post-Implementation Updates
+
+**UI/UX Improvements** (+2 files modified):
+1. **FAQ Section Conversion** - Replaced individual Card components with Accordion component
+   - Better UX with collapsible Q&A items
+   - Consistent with shadcn/ui patterns
+   - Cleaner, more compact presentation
+
+2. **Related Projects Fix** - Updated to match bio site patterns
+   - Removed Button components, replaced with Link (className="project-link")
+   - Added Badge components with categories
+   - Added card-hover class for hover effects
+   - Changed link text from "View Project" to "Learn More →"
+   - Moved content to CardFooter following bio site conventions
+
+### Status
+✅ All implementation complete
+✅ Bio site build successful (4.0s, 18 routes)
+✅ Documentation synced across sources
+✅ UI/UX improvements applied
+⏳ Deployment to avinashsangle.com pending (GitHub Actions auto-deploy on push)
+
+---
+
 ## 2026-01-18: Reddit API Call Optimization - Caching Implementation
 
 ### Problem Identified

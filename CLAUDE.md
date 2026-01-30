@@ -339,6 +339,45 @@ SCORE_TOP_N_RANDOM=5  # Randomize top 5
 
 ---
 
+## Documentation
+
+### Dual Documentation Approach
+
+This project uses a hybrid documentation strategy to serve both public-facing users and local development:
+
+**📚 Bio Site Documentation** (Public)
+- **URL**: [https://avinashsangle.com/projects/reddit-agent](https://avinashsangle.com/projects/reddit-agent)
+- **Purpose**: Comprehensive public-facing guide for users discovering the project
+- **Content**:
+  - Complete setup and installation guide
+  - Configuration walkthrough
+  - Architecture overview
+  - Web dashboard features
+  - FAQ and troubleshooting
+  - SEO-optimized for search engines
+- **Audience**: First-time users, researchers, potential collaborators
+
+**💻 Local Documentation** (Development)
+- **Location**: `web-app/docs/` (Next.js app)
+- **Run**: `cd web-app/docs && npm install && npm run dev`
+- **Port**: localhost:3001 (separate from main web-app)
+- **Purpose**: Technical reference with live examples
+- **Content**: Same as bio site but with interactive admin UI access
+- **Audience**: Developers running the project locally
+
+**🔗 Cross-Linking**
+- README.md includes badge linking to bio site
+- Bio site links back to GitHub repo
+- Both documentation sources kept in sync quarterly
+
+**✅ Maintenance**
+- Update bio site page when major features added
+- Refresh screenshots when UI changes
+- Add FAQ entries from user feedback
+- Keep tech stack versions current
+
+---
+
 ## Key Files to Read
 
 1. **This file** - Project overview and status
@@ -350,6 +389,6 @@ SCORE_TOP_N_RANDOM=5  # Randomize top 5
 
 ---
 
-**Last Updated:** 2026-01-15
+**Last Updated:** 2026-01-30
 **Version:** 2.5
 **Features:** Quality Scoring + Historical Learning + Inbox Priority + Subreddit Diversity

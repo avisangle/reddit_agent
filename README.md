@@ -2,6 +2,8 @@
 
 A compliance-first, anti-fingerprint Reddit engagement agent that responds to comment replies and participates in allow-listed subreddits with strict volume limits and mandatory human approval.
 
+[![Documentation](https://img.shields.io/badge/Documentation-Visit%20Site-blue)](https://avinashsangle.com/projects/reddit-agent)
+
 ## Status: ✅ Fully Operational with Smart Selection
 
 | Metric | Value |
